@@ -1,0 +1,55 @@
+name: Firmware bauen
+
+# Gemeinsame CI aller ESP32-Module (RC_Common 1.2.0): RC_Common-Kopie
+# pruefen, Host-Tests, Arduino-Sketch mit festem Core bauen, App- und
+# Komplett-Image hochladen.
+on:
+  push:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  pull_request:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  workflow_dispatch:
+
+env:
+  SKETCH: firmware/RC_CRSF_Router
+  RC_COMMON: firmware/RC_CRSF_Router/src/RC_Common
+
+jobs:
+  rc-common:
+    name: RC_Common pruefen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kopie unveraendert (MANIFEST.sha256)
+        run: cd "$RC_COMMON" && sha256sum -c --quiet MANIFEST.sha256
+      - name: Host-Tests
+        run: sh "$RC_COMMON/tests/run_tests.sh"
+
+  build:
+    name: Firmware bauen (Arduino, S3)
+    needs: rc-common
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: ESP32-Core und Bibliotheken installieren
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@3.0.7
+          arduino-cli lib install "TinyGPSPlus@1.0.3"
+      # Gleiche Einstellungen wie in der README (Arduino IDE): 4 MB Flash,
+      # "Default 4MB with spiffs" (2 x 1,25 MB OTA + Flash fuer Backups),
+      # Konsole ueber den nativen USB-Anschluss.
+      - name: Kompilieren
+        run: |
+          arduino-cli compile --warnings default \
+            --fqbn "esp32:esp32:esp32s3:CDCOnBoot=cdc,USBMode=hwcdc,FlashSize=4M,PartitionScheme=default" \
+            --output-dir build "$SKETCH"
+          ls -l build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crsf-router-s3-firmware
+          # *.ino.bin = OTA-Update, *.merged.bin = Komplett-Image ab 0x0 (USB)
+          path: build/*.bin
