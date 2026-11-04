@@ -63,9 +63,10 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 1
-static const char*   FW_VERSION       = "0.3.1";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 31
+#define FW_PATCH 2
+static const char*   FW_VERSION       = "0.3.2";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 32
+// v0.3.2: LED-Farben korrigiert (S3-Zero: Rot/Gruen vertauscht), Lua "LED Reihenfolge".
 // v0.3.1: neue Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8.
 // v0.3.0: erste Firmware auf RC_Common 1.2.0 (Router, Rollen, Lua, WebUI,
 //         Status-LED in Farben, Spannung/Temperatur als Telemetrie).
@@ -108,8 +109,8 @@ void routerRequestRestart() { cfgSave(); restartAtMs = millis() + 500; if (!rest
 // 14 Ordner Status  15 Frames runter  16 Frames hoch  17 Verworfen
 //                   18 CRC-Fehler unten  19 Adresskonflikt
 // 20 Ordner WLAN    21 WLAN jetzt  22 Auto-WLAN  23 Auto-WLAN Timeout  24 WLAN dauerhaft an
-// 25 Neustart       26 Info Geraetename
-static constexpr uint8_t LUA_COUNT = 26;
+// 25 Neustart       26 Info Geraetename  27 LED Reihenfolge
+static constexpr uint8_t LUA_COUNT = 27;
 static LuaItem luaItems[LUA_COUNT + 1];
 static LuaMenu luaMenu(luaItems, sizeof(luaItems) / sizeof(luaItems[0]));
 
@@ -151,6 +152,8 @@ static uint8_t luaGetWifiTmo(uint8_t)             { return (uint8_t)constrain(cf
 static void    luaSetWifiTmo(uint8_t, uint8_t v)  { cfg.common.wifiTimeout = v; cfgMarkDirty(); }
 static uint8_t luaGetWifiAlw(uint8_t)             { return cfg.common.wifiAlways ? 1 : 0; }
 static void    luaSetWifiAlw(uint8_t, uint8_t v)  { cfg.common.wifiAlways = v; cfgMarkDirty(); }
+static uint8_t luaGetLedRgb(uint8_t)              { return cfg.ledRgb ? 0 : 1; }
+static void    luaSetLedRgb(uint8_t, uint8_t v)   { cfg.ledRgb = (v == 0); cfgMarkDirty(); }
 static uint8_t luaGetRestart(uint8_t)             { return restartAtMs ? 1 : 0; }
 static void    luaSetRestart(uint8_t, uint8_t v)  { if (v) routerRequestRestart(); }
 
@@ -183,10 +186,17 @@ static void buildLuaMenu() {
     m.select(24, 20, "WLAN dauerhaft an", AUS_EIN, luaGetWifiAlw, luaSetWifiAlw);
     m.select(25, 0, "Neustart", "Nein;Jetzt", luaGetRestart, luaSetRestart);
     m.info(26, 0, "Geraetename", "")->view = luaShowName;
+    m.select(27, 0, "LED Reihenfolge", "RGB (S3-Zero);GRB", luaGetLedRgb, luaSetLedRgb);
 }
 
 // ======== Status-LED (Farben) =========================================
 // Muster aus RC_Common (statusLedMode/statusLedOn), Farbe hier im Projekt.
+// neopixelWrite sendet GRB; die LED des S3-Zero erwartet RGB -> Rot/Gruen tauschen
+static void ledWrite(uint8_t r, uint8_t g, uint8_t b) {
+    if (cfg.ledRgb) neopixelWrite(PIN_STATUS_LED, g, r, b);
+    else            neopixelWrite(PIN_STATUS_LED, r, g, b);
+}
+
 static void updateLed() {
     unsigned long now = millis();
     const LinkStatistics& ls = crsf.getLinkStatistics();
@@ -209,7 +219,7 @@ static void updateLed() {
     bool on = statusLedOn(mode, now - start);
     static int8_t last = -1; static uint32_t lastRgb = 0;
     uint32_t rgb = on ? ((uint32_t)r << 16 | (uint32_t)g << 8 | b) : 0;
-    if ((int8_t)on != last || rgb != lastRgb) { neopixelWrite(PIN_STATUS_LED, r * on, g * on, b * on); last = on; lastRgb = rgb; }
+    if ((int8_t)on != last || rgb != lastRgb) { ledWrite(r * on, g * on, b * on); last = on; lastRgb = rgb; }
 }
 
 // BOOT-Taste: 3 s nach dem Start druecken = WLAN an (LED blinkt blau)
@@ -221,10 +231,10 @@ static bool waitForWifiButton() {
             delay(30);
             if (digitalRead(PIN_BOOT_BUTTON) == LOW) { pressed = true; break; }
         }
-        neopixelWrite(PIN_STATUS_LED, 0, 0, ((millis() - start) / 250) % 2 ? 40 : 0);
+        ledWrite(0, 0, ((millis() - start) / 250) % 2 ? 40 : 0);
         delay(10);
     }
-    neopixelWrite(PIN_STATUS_LED, 0, 0, 0);
+    ledWrite(0, 0, 0);
     return pressed;
 }
 
