@@ -13,9 +13,10 @@
      - nur vollstaendige Frames mit gueltiger CRC, unveraendert
 
    ── Ports (pins.h) ────────────────────────────────────────────────────
-   Uplink  = CRSF zum Empfaenger, Serial2, RX 5 / TX 6, fest
-   Port B  = Serial1, RX 7 / TX 8      Rolle Aus/CRSF/S.Port/GPS/Raw
-   Port C  = Serial0, RX 44 / TX 43    Rolle wie Port B
+   Port A  = Eingang (Uplink) CRSF zum Empfaenger, Serial2, RX 14 / TX 15, fest
+   Port B  = Serial1, RX 5 / TX 6      Rolle Aus/CRSF/S.Port/GPS/Raw
+   Port C  = Serial0, RX 7 / TX 8      Rolle wie Port B
+   Rolle und Baudrate von Port B/C im Lua-Menue (Ordner "Ports") oder WebUI.
    Rollen und Baudraten gelten nach einem Neustart. S.Port, GPS und Raw
    nur auf einem Port (doppelt gewaehlt laeuft die Rolle auf Port B).
 
@@ -62,9 +63,10 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 0
-static const char*   FW_VERSION       = "0.3.0";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 30
+#define FW_PATCH 1
+static const char*   FW_VERSION       = "0.3.1";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 31
+// v0.3.1: neue Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8.
 // v0.3.0: erste Firmware auf RC_Common 1.2.0 (Router, Rollen, Lua, WebUI,
 //         Status-LED in Farben, Spannung/Temperatur als Telemetrie).
 // v0.2.0: Geruest mit eigenem CRSF-Code (firmware/v0.2.0-geruest, ungetestet).
