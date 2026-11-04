@@ -25,6 +25,7 @@ struct RouterConfig {
     int8_t  voltCorr;          // Korrektur in 0,1 V, -5..+5
     bool    tempSend;          // Temperatur als CRSF-Telemetrie (0x0D)
     uint8_t sportPollId[2];    // S.Port Poll-Bytes Sensor 1/2
+    bool    ledRgb;            // LED-Farbreihenfolge: true = RGB (S3-Zero), false = GRB (WS2812-Standard)
 };
 
 extern RouterConfig  cfg;

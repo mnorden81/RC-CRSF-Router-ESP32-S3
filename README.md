@@ -2,9 +2,9 @@
 
 CRSF-Verteiler für ELRS-Empfänger auf einem **ESP32-S3-Zero**. Der Router hängt an einem freien CRSF-Port des Empfängers und verteilt CRSF auf zwei weitere Ports (Port B und Port C). So lassen sich mehrere Module an einem Empfänger betreiben und verketten: RC-Multiswitch C3/S3, Multiswitch Basis (Ziege-One), Soundmodule, G030-Multiswitch und weitere Router.
 
-> **Stand:** Firmware v0.3.1 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.2.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions, **noch nicht auf Hardware getestet**. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
+> **Stand:** Firmware v0.3.2 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.2.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions, **noch nicht auf Hardware getestet**. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
 
-## Funktionen (v0.3.1)
+## Funktionen (v0.3.2)
 
 - Weiterleitung Empfänger → Port B/C und zurück, Ketten über mehrere Stufen (RC_Common-Router). Nach unten geht alles außer Anfragen an die eigene Adresse, nach oben alles, zwischen B und C nie.
 - Jeder Port wählbar: Aus / CRSF / S.Port / GPS / Raw (Lua und WebUI), gilt nach Neustart
@@ -25,6 +25,8 @@ Geplant für später: Geräteliste und Telemetrie-Übersicht über den ganzen Ba
 | rot schnell | kein RC-Signal / Failsafe |
 | gelb Doppelblitz | Adresskonflikt oder doppelte Port-Rolle |
 | blau blinkend (3 s nach dem Start) | jetzt BOOT drücken = WLAN an |
+
+Beim ESP32-S3-Zero sind Rot und Grün in der LED vertauscht. Die Vorgabe „LED Reihenfolge: RGB (S3-Zero)“ im Lua-Menü gleicht das aus; bei einem Board mit Standard-WS2812 dort „GRB“ wählen.
 
 ## WLAN
 

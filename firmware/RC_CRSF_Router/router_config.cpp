@@ -28,6 +28,7 @@ void cfgDefaults() {
     cfg.tempSend       = false;
     cfg.sportPollId[0] = 0xA1;     // Physical ID 1 (Werkseinstellung FLVSS)
     cfg.sportPollId[1] = 0x22;     // Physical ID 2
+    cfg.ledRgb         = true;     // S3-Zero: Rot und Gruen sind gegenueber WS2812 vertauscht
 }
 
 void cfgSanitize() {
@@ -48,6 +49,7 @@ void cfgLoad() {
     cfg.tempSend       = p.getInt("tsend", cfg.tempSend ? 1 : 0) != 0;
     cfg.sportPollId[0] = (uint8_t)p.getInt("spid0", cfg.sportPollId[0]);
     cfg.sportPollId[1] = (uint8_t)p.getInt("spid1", cfg.sportPollId[1]);
+    cfg.ledRgb         = p.getInt("ledrgb", cfg.ledRgb ? 1 : 0) != 0;
     p.end();
     cfgSanitize();
 }
@@ -62,6 +64,7 @@ void cfgSave() {
     p.putInt("tsend", cfg.tempSend ? 1 : 0);
     p.putInt("spid0", cfg.sportPollId[0]);
     p.putInt("spid1", cfg.sportPollId[1]);
+    p.putInt("ledrgb", cfg.ledRgb ? 1 : 0);
     p.end();
     cfgDirty = false;
 }
