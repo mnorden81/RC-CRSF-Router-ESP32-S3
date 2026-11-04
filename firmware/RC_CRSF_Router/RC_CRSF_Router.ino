@@ -31,7 +31,9 @@
    violett langsam    RC-Signal in Ordnung, WLAN an
    rot schnell        kein RC-Signal / Failsafe
    gelb Doppelblitz   Adresskonflikt oder doppelte Port-Rolle
+   violett schnell    kein RC-Signal, WLAN an
    blau blinkend      3 s nach dem Start: BOOT druecken = WLAN an
+   Im Betrieb: BOOT 2 s halten = WLAN an/aus
 
    ── Telemetrie ────────────────────────────────────────────────────────
    Empfaengerspannung (Spannungsteiler an GPIO1) als RxBt oder Zellen-Wert,
@@ -63,9 +65,12 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 2
-static const char*   FW_VERSION       = "0.3.2";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 32
+#define FW_PATCH 3
+static const char*   FW_VERSION       = "0.3.3";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 33
+// v0.3.3: Fehlersuche Eingang: Bytes/Frames/CRC von Port A auf USB (alle 2 s) und in
+//         der WebUI; BOOT jederzeit 2 s halten = WLAN an/aus; ohne Signal und
+//         mit WLAN blinkt die LED violett schnell statt rot.
 // v0.3.2: LED-Farben korrigiert (S3-Zero: Rot/Gruen vertauscht), Lua "LED Reihenfolge".
 // v0.3.1: neue Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8.
 // v0.3.0: erste Firmware auf RC_Common 1.2.0 (Router, Rollen, Lua, WebUI,
@@ -213,6 +218,7 @@ static void updateLed() {
     if (mode != ledMode) { ledMode = mode; start = now; }
     uint8_t r = 0, g = 0, b = 0;
     if (mode == SLED_DOUBLE)    { r = 40; g = 28; ledText = "gelb Doppelblitz: Adresskonflikt oder doppelte Port-Rolle"; }
+    else if (mode == SLED_FAST && webApActive()) { r = 24; b = 40; ledText = "violett schnell: kein RC-Signal, WLAN an"; }
     else if (mode == SLED_FAST) { r = 40;         ledText = "rot schnell: kein RC-Signal"; }
     else if (webApActive())     { r = 24; b = 40; ledText = "violett: RC-Signal OK, WLAN an"; }
     else                        { g = 40;         ledText = "gruen: RC-Signal OK"; }
@@ -236,6 +242,32 @@ static bool waitForWifiButton() {
     }
     ledWrite(0, 0, 0);
     return pressed;
+}
+
+// BOOT-Taste im Betrieb: 2 s gedrueckt halten = WLAN an/aus (einmal je Druck)
+static void checkWifiButton(unsigned long now) {
+    static unsigned long downSince = 0;
+    static bool done = true;    // erst nach dem Loslassen scharf (Taste beim Start)
+    if (digitalRead(PIN_BOOT_BUTTON) == LOW) {
+        if (!downSince) downSince = now ? now : 1;
+        if (!done && now - downSince >= WIFI_BUTTON_HOLD_MS) {
+            done = true;
+            if (webApActive()) webDisableAP(); else webEnableAP();
+        }
+    } else {
+        downSince = 0;
+        done = false;
+    }
+}
+
+// Fehlersuche: was kommt am Eingang (Port A) an? Alle 2 s auf USB
+static void printUplinkDiag(unsigned long now) {
+    static unsigned long last = 0;
+    if (now - last < 2000) return;
+    last = now;
+    Serial.printf("Port A (RX %d / TX %d): Bytes %u, gueltige Frames %u, CRC-Fehler %u, RC %s\n",
+                  PIN_UPLINK_RX, PIN_UPLINK_TX, (unsigned)crsf.getRawBytesRx(), (unsigned)crsf.getValidFrames(),
+                  (unsigned)crsf.getCrcErrors(), busOk ? "ja" : "nein");
 }
 
 // ======== Telemetrie ==================================================
@@ -272,6 +304,8 @@ String routerStatusJson() {
     String j = "{\"version\":\"" + String(FW_VERSION) + "\",\"rcCommon\":\"" RC_COMMON_VERSION "\"";
     j += ",\"rc\":" + String(busOk && crsf.getLastRcFrameMs() && millis() - crsf.getLastRcFrameMs() < 1000 ? "true" : "false");
     j += ",\"lq\":" + String(ls.uplinkLQ);
+    j += ",\"rxBytes\":" + String(crsf.getRawBytesRx()) + ",\"rxFrames\":" + String(crsf.getValidFrames()) +
+         ",\"rxCrc\":" + String(crsf.getCrcErrors());
     j += ",\"moduleAddr\":" + String(cfg.common.moduleAddr);
     j += ",\"dupAddr\":" + String(crsf.isDuplicateAddress() ? "true" : "false");
     j += ",\"ledText\":\"" + String(ledText) + "\"";
@@ -339,6 +373,8 @@ void loop() {
     if (busOk) uartPortsTelemetry(crsf);
     sendOwnTelemetry();
     updateLed();
+    checkWifiButton(now);
+    printUplinkDiag(now);
 
     if (crsf.getDeviceInfoReplyPending() && now - crsf.getPingTime() >= slotDelayMs()) {
         crsf.setDeviceInfoReplyPending(false);

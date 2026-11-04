@@ -111,7 +111,7 @@ $('imp').onchange=function(){var f=this.files[0];if(!f)return;var rd=new FileRea
 $('ota').onchange=function(){rcOtaUpload(this.files[0],$('omsg'),this,null,function(){return rcBackupSnapshot(collect);});};
 function poll(){fetch('/api/status').then(function(r){return r.json();}).then(function(s){
   $('hdr').textContent='v'+s.version+' · '+hex(s.moduleAddr);
-  kv('st',[['RC-Signal',s.rc?'<b class="ok">OK</b>':'<b class="bad">kein Signal</b>'],['Link-Qualität',s.lq+' %'],
+  kv('st',[['RC-Signal',s.rc?'<b class="ok">OK</b>':'<b class="bad">kein Signal</b>'],['Link-Qualität',s.lq+' %'],['Eingang (Port A)',s.rxBytes+' Bytes · '+s.rxFrames+' Frames · '+s.rxCrc+' CRC-Fehler'],
     ['Status-LED',s.ledText],['Moduladresse','WM '+s.moduleAddr+' · '+hex(s.moduleAddr)],
     ['Adresskonflikt',s.dupAddr?'<b class="bad">ja, ein Gerät weiter hinten hat dieselbe Adresse</b>':'nein'],
     ['Empfängerspannung',s.volt.toFixed(2)+' V'],['Temperatur',s.temp.toFixed(1)+' °C'],['Laufzeit',Math.floor(s.uptime/60)+' min']]);

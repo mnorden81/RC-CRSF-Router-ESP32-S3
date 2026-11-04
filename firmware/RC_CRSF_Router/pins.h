@@ -34,6 +34,8 @@
 // ── BOOT-Taste (GPIO0): innerhalb von 3 s nach dem Start druecken = WLAN an
 #define PIN_BOOT_BUTTON 0
 #define WIFI_BUTTON_WINDOW_MS 3000
+// Im Betrieb: BOOT 2 s halten = WLAN an/aus
+#define WIFI_BUTTON_HOLD_MS   2000
 
 // ── Empfaengerspannung: Spannungsteiler an ADC1_CH0 ──────────────────
 //   +V (Empfaenger) ── 33 kOhm ──┬── GPIO1

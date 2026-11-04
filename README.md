@@ -2,9 +2,9 @@
 
 CRSF-Verteiler für ELRS-Empfänger auf einem **ESP32-S3-Zero**. Der Router hängt an einem freien CRSF-Port des Empfängers und verteilt CRSF auf zwei weitere Ports (Port B und Port C). So lassen sich mehrere Module an einem Empfänger betreiben und verketten: RC-Multiswitch C3/S3, Multiswitch Basis (Ziege-One), Soundmodule, G030-Multiswitch und weitere Router.
 
-> **Stand:** Firmware v0.3.2 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.2.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions, **noch nicht auf Hardware getestet**. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
+> **Stand:** Firmware v0.3.3 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.2.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions, **noch nicht auf Hardware getestet**. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
 
-## Funktionen (v0.3.2)
+## Funktionen (v0.3.3)
 
 - Weiterleitung Empfänger → Port B/C und zurück, Ketten über mehrere Stufen (RC_Common-Router). Nach unten geht alles außer Anfragen an die eigene Adresse, nach oben alles, zwischen B und C nie.
 - Jeder Port wählbar: Aus / CRSF / S.Port / GPS / Raw (Lua und WebUI), gilt nach Neustart
@@ -23,6 +23,7 @@ Geplant für später: Geräteliste und Telemetrie-Übersicht über den ganzen Ba
 | grün langsam | RC-Signal in Ordnung |
 | violett langsam | RC-Signal in Ordnung, WLAN an |
 | rot schnell | kein RC-Signal / Failsafe |
+| violett schnell | kein RC-Signal, WLAN an |
 | gelb Doppelblitz | Adresskonflikt oder doppelte Port-Rolle |
 | blau blinkend (3 s nach dem Start) | jetzt BOOT drücken = WLAN an |
 
@@ -30,7 +31,7 @@ Beim ESP32-S3-Zero sind Rot und Grün in der LED vertauscht. Die Vorgabe „LED 
 
 ## WLAN
 
-Access Point **CRSF-Router**, Passwort `123456789`, Seite http://192.168.1.1. Einschalten über BOOT-Taste (3 s nach dem Start), Lua „WLAN jetzt“, automatisch nach 60 s ohne RC-Signal oder „WLAN dauerhaft an“ (Vorgabe aus).
+Access Point **CRSF-Router**, Passwort `123456789`, Seite http://192.168.1.1. Einschalten über BOOT-Taste (3 s nach dem Start drücken oder im Betrieb jederzeit 2 s halten, das schaltet auch wieder aus), Lua „WLAN jetzt“, automatisch nach 60 s ohne RC-Signal oder „WLAN dauerhaft an“ (Vorgabe aus).
 
 ## Arduino IDE
 
@@ -45,6 +46,8 @@ Board **ESP32S3 Dev Module**, USB CDC On Boot: Enabled, Flash Size 4MB, Partitio
 | Port C | RX 7, TX 8 |
 | Status-LED | GPIO21 |
 | Empfängerspannung | GPIO1 über Teiler 33 kΩ / 10 kΩ |
+
+**Fehlersuche Eingang:** Im seriellen Monitor (USB, 115200) steht alle 2 s, wie viele Bytes, gültige Frames und CRC-Fehler an Port A ankommen; dasselbe zeigt die WebUI unter Status. Bytes = 0 heißt: am RX-Pin kommt nichts an (Kabel/Pin). Bytes steigen, aber keine Frames: falsche Baudrate oder Störung.
 
 Alle Ports vollduplex. Rolle (Aus/CRSF/S.Port/GPS/Raw) und Baudrate von Port B und C werden im Lua-Menü (Ordner „Ports“) oder in der WebUI eingestellt und gelten nach einem Neustart. S.Port wird extern mit einer Diode (1N4148) auf eine Leitung gebracht.
 
