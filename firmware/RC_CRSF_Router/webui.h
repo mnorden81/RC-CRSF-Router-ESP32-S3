@@ -38,8 +38,8 @@ button.s{font:inherit;border:1px solid var(--line);background:var(--p);color:var
 </section>
 <section id="t-ports" hidden>
  <div class="card"><h2>Ports</h2>
-  <label>Port B (RX 5, TX 6) <span><select id="pbr"></select> <select id="pbb"></select></span></label>
-  <label>Port C (RX 7, TX 8) <span><select id="pcr"></select> <select id="pcb"></select></span></label>
+  <label>Port B (RX 7, TX 8) <span><select id="pbr"></select> <select id="pbb"></select></span></label>
+  <label>Port C (RX 44, TX 43) <span><select id="pcr"></select> <select id="pcb"></select></span></label>
   <label>Moduladresse (WM) <select id="madr"></select></label>
   <p class="mut">CRSF = weitere Module (Kette), S.Port = FLVSS/MLVSS über Diode, GPS = NMEA-Modul. Rollen und Baudraten gelten nach einem Neustart.</p>
   <div class="row"><button class="b" id="savePorts">Speichern</button><button class="s" id="rst1">Neustart</button><span id="pmsg" class="mut"></span></div>

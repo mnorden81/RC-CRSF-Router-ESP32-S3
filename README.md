@@ -41,9 +41,9 @@ Board **ESP32S3 Dev Module**, USB CDC On Boot: Enabled, Flash Size 4MB, Partitio
 
 | Funktion | Pins |
 |---|---|
-| Port A: Eingang vom Empfänger (CRSF) | RX 14, TX 15 |
-| Port B | RX 5, TX 6 |
-| Port C | RX 7, TX 8 |
+| Port A: Eingang vom Empfänger (CRSF) | RX 5, TX 6 |
+| Port B | RX 7, TX 8 |
+| Port C | RX 44, TX 43 |
 | Status-LED | GPIO21 |
 | Empfängerspannung | GPIO1 über Teiler 33 kΩ / 10 kΩ |
 

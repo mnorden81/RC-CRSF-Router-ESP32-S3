@@ -13,9 +13,9 @@
      - nur vollstaendige Frames mit gueltiger CRC, unveraendert
 
    ── Ports (pins.h) ────────────────────────────────────────────────────
-   Port A  = Eingang (Uplink) CRSF zum Empfaenger, Serial2, RX 14 / TX 15, fest
-   Port B  = Serial1, RX 5 / TX 6      Rolle Aus/CRSF/S.Port/GPS/Raw
-   Port C  = Serial0, RX 7 / TX 8      Rolle wie Port B
+   Port A  = Eingang (Uplink) CRSF zum Empfaenger, Serial2, RX 5 / TX 6, fest
+   Port B  = Serial1, RX 7 / TX 8      Rolle Aus/CRSF/S.Port/GPS/Raw
+   Port C  = Serial0, RX 44 / TX 43    Rolle wie Port B
    Rolle und Baudrate von Port B/C im Lua-Menue (Ordner "Ports") oder WebUI.
    Rollen und Baudraten gelten nach einem Neustart. S.Port, GPS und Raw
    nur auf einem Port (doppelt gewaehlt laeuft die Rolle auf Port B).
@@ -68,7 +68,7 @@
 #define FW_PATCH 3
 static const char*   FW_VERSION       = "0.3.3";
 static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 33
-// v0.3.3: Fehlersuche Eingang: Bytes/Frames/CRC von Port A auf USB (alle 2 s) und in
+// v0.3.3: Pins wieder wie v0.3.0 (A 5/6, B 7/8, C 44/43). Fehlersuche Eingang: Bytes/Frames/CRC von Port A auf USB (alle 2 s) und in
 //         der WebUI; BOOT jederzeit 2 s halten = WLAN an/aus; ohne Signal und
 //         mit WLAN blinkt die LED violett schnell statt rot.
 // v0.3.2: LED-Farben korrigiert (S3-Zero: Rot/Gruen vertauscht), Lua "LED Reihenfolge".
