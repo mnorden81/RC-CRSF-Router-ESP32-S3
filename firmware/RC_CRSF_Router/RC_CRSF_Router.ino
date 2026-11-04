@@ -70,6 +70,8 @@ static const char*   FW_VERSION       = "0.3.4";
 static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 34
 // v0.3.4: Pins endgueltig: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8
 //         (Fehler bei v0.3.1 war ein Wackler in der Verkabelung).
+//         RC_Common 1.2.1: Lua-Felder ueber 55 Byte (Port-Baudraten) werden
+//         Chunk fuer Chunk beantwortet - vorher fehlte der Ordner "Ports" im Lua.
 // v0.3.3: Pins wieder wie v0.3.0 (A 5/6, B 7/8, C 44/43). Fehlersuche Eingang: Bytes/Frames/CRC von Port A auf USB (alle 2 s) und in
 //         der WebUI; BOOT jederzeit 2 s halten = WLAN an/aus; ohne Signal und
 //         mit WLAN blinkt die LED violett schnell statt rot.

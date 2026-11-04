@@ -125,6 +125,7 @@ public:
     bool getDeviceCommandReplyPending() const { return deviceCommandReplyPending; }
     uint8_t getPingSource()      const { return pingSource; }
     uint8_t getParamReadIndex()  const { return paramReadIndex; }
+    uint8_t getParamReadChunk()  const { return paramReadChunk; }
     uint8_t getParamWriteIndex() const { return paramWriteIndex; }
     uint8_t getParamWriteValue() const { return paramWriteValue; }
     uint8_t getParamReadSource() const { return paramReadSource; }
@@ -198,6 +199,7 @@ private:
     uint8_t cmdBuffer[CRSF_PACKET_SIZE] = {0}; // gesicherte Kopie des letzten MWSET-Kommandos
     uint8_t pingSource    = 0xEA;  // Source des letzten DEVICE_PING
     uint8_t paramReadIndex  = 0;   // Angefragter Parameter-Index
+    uint8_t paramReadChunk  = 0;   // Angefragter Chunk (RC_Common 1.2.1)
     uint8_t paramWriteIndex = 0;   // Zu schreibender Parameter-Index
     uint8_t paramWriteValue = 0;   // Zu schreibender Wert
     uint8_t paramReadSource  = 0xEF; // Source des PARAMETER_READ -> Destination der Antwort

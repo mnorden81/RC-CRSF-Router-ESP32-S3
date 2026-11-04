@@ -313,6 +313,9 @@ void CRSF::crsfDataReceive() {
             paramReadsRx++;
             paramReadSource = crfs_buffer[4];  // Source = Destination fuer Antwort
             paramReadIndex = crfs_buffer[5];  // angefragter Parameter
+            // Chunk-Nummer (seit 1.2.1): lange Eintraege fragt der Sender
+            // Chunk fuer Chunk ab, geantwortet wird nur mit diesem Chunk.
+            paramReadChunk = crfs_buffer[1] >= 6 ? crfs_buffer[6] : 0;
             deviceReadReplyPending = true;
 #if DEBUG_CRSF_TYPE 
             Serial.print("📤 CRSF_FRAMETYPE_PARAMETER_READ Destination: ");
@@ -328,6 +331,7 @@ void CRSF::crsfDataReceive() {
             if (crfs_buffer[3] != deviceAddress &&
                 crfs_buffer[3] != CRSF_ADDRESS_BROADCAST) break;
             paramWritesRx++;
+            paramReadChunk = 0;   // Antwort auf ein Schreiben beginnt bei Chunk 0
             paramWriteIndex = crfs_buffer[5];  // Parameter-Index
             paramWriteValue = crfs_buffer[6];  // Wert
             deviceWriteReplyPending = true;
@@ -922,9 +926,16 @@ void CRSF::send_param_response_CRSF_TEXT_SELECTION(
     // Serial.print(total_chunks);
 
     // ----------------------------------------------------
-    // 3. Chunks senden
+    // 3. Nur den angefragten Chunk senden (seit 1.2.1)
     // ----------------------------------------------------
-    for (uint8_t chunk = 0; chunk < total_chunks; chunk++)
+    // Vorher gingen alle Chunks auf einmal raus und die Chunk-Nummer der
+    // Anfrage wurde ignoriert. Das ELRS-Lua fragt Chunk 1, 2 ... einzeln an
+    // und bekam jedes Mal wieder Chunk 0 - Eintraege ueber 55 Byte (z. B.
+    // "Port B Baudrate") wurden nie fertig geladen, der ganze Ordner fehlte.
+    uint8_t want = paramReadChunk < total_chunks ? paramReadChunk : 0;
+    paramReadChunk = 0;
+    offset = (uint16_t)want * MAX_CHUNK;
+    for (uint8_t chunk = want; chunk <= want; chunk++)
     {
         uint8_t remaining = total_chunks - chunk - 1;
         uint8_t size = ((uint16_t)(p - offset) > MAX_CHUNK)
@@ -934,7 +945,10 @@ void CRSF::send_param_response_CRSF_TEXT_SELECTION(
     // Serial.print(" remaining  : ");
     // Serial.print(remaining );
 
-        uint8_t len = 7 + size; // Header + Payload
+        // Laenge = Typ, Ziel, Absender, ID, Rest-Chunks (5) + Nutzdaten + CRC.
+        // Bis 1.2.0 stand hier 7 + size: ein ungenutztes Byte vor der CRC,
+        // das beim Zusammensetzen mehrerer Chunks mitten in die Optionen geriet.
+        uint8_t len = 6 + size;
         uint8_t packet[64];
 
         packet[0] = CRSF_SYNC_byte;

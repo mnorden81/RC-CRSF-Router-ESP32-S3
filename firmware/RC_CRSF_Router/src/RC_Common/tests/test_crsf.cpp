@@ -256,26 +256,35 @@ static void test_mwprop_has_command_crc(void) {
 }
 
 static void test_text_selection_chunks(void) {
-    // Optionen > 55 Byte werden in Chunks aufgeteilt; jeder Chunk ist ein
-    // gueltiger Frame <= 64 Byte, "chunks remaining" zaehlt herunter.
+    // Optionen > 55 Byte werden in Chunks aufgeteilt. Seit 1.2.1 geht je
+    // Anfrage nur der angefragte Chunk raus; jeder ist ein gueltiger Frame
+    // <= 64 Byte, "chunks remaining" zaehlt herunter, zusammengesetzt ergibt
+    // sich der vollstaendige Eintrag.
+    crsf.setDeviceAddress(0xC4);
     std::string opts;
     for (int i = 0; i < 12; i++) opts += "Option" + std::to_string(i) + ";";
-    crsf.send_param_response_CRSF_TEXT_SELECTION(5, 0, "Auswahl", opts.c_str(), 1, 0, 11);
-    size_t pos = 0;
-    int frames = 0;
-    int lastRemaining = -1;
-    while (pos < io.tx.size()) {
-        size_t n = io.tx[pos + 1] + 2;
+    std::vector<uint8_t> payload;
+    int chunk = 0, remaining = -1;
+    do {
+        io.tx.clear();
+        io.feed(frame(CRSF_FRAMETYPE_PARAMETER_READ, {0xC4, 0xEF, 5, (uint8_t)chunk}, 0xEE));
+        crsf.read_packets(0);
+        TEST_ASSERT_EQUAL_UINT8(chunk, crsf.getParamReadChunk());
+        crsf.send_param_response_CRSF_TEXT_SELECTION(5, 0, "Auswahl", opts.c_str(), 1, 0, 11);
+        size_t n = io.tx[1] + 2;
+        TEST_ASSERT_EQUAL_UINT32(n, io.tx.size());          // genau ein Frame
         TEST_ASSERT_TRUE(n <= 64);
-        std::vector<uint8_t> f(io.tx.begin() + pos, io.tx.begin() + pos + n);
-        assert_valid_frame(f);
-        if (lastRemaining >= 0) TEST_ASSERT_EQUAL_INT(lastRemaining - 1, f[6]);
-        lastRemaining = f[6];
-        pos += n;
-        frames++;
-    }
-    TEST_ASSERT_TRUE(frames >= 2);
-    TEST_ASSERT_EQUAL_INT(0, lastRemaining);
+        assert_valid_frame(io.tx);
+        if (remaining >= 0) TEST_ASSERT_EQUAL_INT(remaining - 1, io.tx[6]);
+        remaining = io.tx[6];
+        payload.insert(payload.end(), io.tx.begin() + 7, io.tx.end() - 1);
+        chunk++;
+    } while (remaining > 0 && chunk < 10);
+    TEST_ASSERT_TRUE(chunk >= 2);
+    TEST_ASSERT_EQUAL_INT(0, remaining);
+    // Name und Optionen stehen vollstaendig im zusammengesetzten Eintrag
+    TEST_ASSERT_EQUAL_STRING("Auswahl", (const char*)&payload[2]);
+    TEST_ASSERT_EQUAL_STRING(opts.c_str(), (const char*)&payload[2 + 8]);
 }
 
 // ── Router (seit 1.1.0) ────────────────────────────────────────────────
