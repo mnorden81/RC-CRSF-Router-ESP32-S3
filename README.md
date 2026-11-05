@@ -2,13 +2,13 @@
 
 CRSF-Verteiler für ELRS-Empfänger auf einem **ESP32-S3-Zero**. Der Router hängt an einem freien CRSF-Port des Empfängers und verteilt CRSF auf zwei weitere Ports (Port B und Port C). So lassen sich mehrere Module an einem Empfänger betreiben und verketten: RC-Multiswitch C3/S3, Multiswitch Basis (Ziege-One), Soundmodule, G030-Multiswitch und weitere Router.
 
-> **Stand:** Firmware v0.3.4 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.2.1** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
+> **Stand:** Firmware v0.3.5 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.2.1** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
 
 ![Testaufbau: TX16S zeigt CRSF-Router@15 und zwei Sound-Minis hinter dem Router](docs/bilder/testaufbau.jpg)
 
 *Testaufbau 05.11.2026: ELRS-Empfänger, S3-Router und zwei Sound-Minis. Der Sender (TX16S) zeigt unter „Other Devices“ den Router „CRSF-Router@15“ und die Module „Sound-Mini@0“ und „Sound-Mini@1“ hinter ihm.*
 
-## Funktionen (v0.3.4)
+## Funktionen (v0.3.5)
 
 - Weiterleitung Empfänger → Port B/C und zurück, Ketten über mehrere Stufen (RC_Common-Router). Nach unten geht alles außer Anfragen an die eigene Adresse, nach oben alles, zwischen B und C nie.
 - Jeder Port wählbar: Aus / CRSF / S.Port / GPS / Raw (Lua und WebUI), gilt nach Neustart
@@ -45,7 +45,7 @@ Board **ESP32S3 Dev Module**, USB CDC On Boot: Enabled, Flash Size 4MB, Partitio
 
 | Funktion | Pins |
 |---|---|
-| Port A: Eingang vom Empfänger (CRSF) | RX 14, TX 15 |
+| Port A: Eingang vom Empfänger (CRSF) | RX 44, TX 43 (Pins „RX“/„TX“ rechts oben) |
 | Port B | RX 5, TX 6 |
 | Port C | RX 7, TX 8 |
 | Status-LED | GPIO21 |

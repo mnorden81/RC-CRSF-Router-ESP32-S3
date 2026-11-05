@@ -13,9 +13,9 @@
      - nur vollstaendige Frames mit gueltiger CRC, unveraendert
 
    ── Ports (pins.h) ────────────────────────────────────────────────────
-   Port A  = Eingang (Uplink) CRSF zum Empfaenger, Serial2, RX 14 / TX 15, fest
+   Port A  = Eingang (Uplink) CRSF zum Empfaenger, Serial0, RX 44 / TX 43, fest
    Port B  = Serial1, RX 5 / TX 6      Rolle Aus/CRSF/S.Port/GPS/Raw
-   Port C  = Serial0, RX 7 / TX 8      Rolle wie Port B
+   Port C  = Serial2, RX 7 / TX 8      Rolle wie Port B
    Rolle und Baudrate von Port B/C im Lua-Menue (Ordner "Ports") oder WebUI.
    Rollen und Baudraten gelten nach einem Neustart. S.Port, GPS und Raw
    nur auf einem Port (doppelt gewaehlt laeuft die Rolle auf Port B).
@@ -65,10 +65,12 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 4
-static const char*   FW_VERSION       = "0.3.4";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 34
-// v0.3.4: Pins endgueltig: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8
+#define FW_PATCH 5
+static const char*   FW_VERSION       = "0.3.5";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 35
+// v0.3.5: Port A auf RX44/TX43 (Serial0), Port C auf Serial2 (7/8). GPIO14/15
+//         liegen beim S3-Zero nicht auf der Stiftleiste (nur Loetpads).
+// v0.3.4: Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8
 //         (Fehler bei v0.3.1 war ein Wackler in der Verkabelung).
 //         RC_Common 1.2.1: Lua-Felder ueber 55 Byte (Port-Baudraten) werden
 //         Chunk fuer Chunk beantwortet - vorher fehlte der Ordner "Ports" im Lua.
@@ -81,9 +83,9 @@ static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATC
 //         Status-LED in Farben, Spannung/Temperatur als Telemetrie).
 // v0.2.0: Geruest mit eigenem CRSF-Code (firmware/v0.2.0-geruest, ungetestet).
 
-static HardwareSerial* const UPLINK_SERIAL = &Serial2;
+static HardwareSerial* const UPLINK_SERIAL = &Serial0;
 static HardwareSerial* const PORTB_SERIAL  = &Serial1;
-static HardwareSerial* const PORTC_SERIAL  = &Serial0;
+static HardwareSerial* const PORTC_SERIAL  = &Serial2;
 
 static UartPort uartPorts[2] = {
     {"Port B", PORTB_SERIAL, PIN_PORTB_RX, PIN_PORTB_TX, UROLE_OFF, 0, UROLE_OFF, false, false},
