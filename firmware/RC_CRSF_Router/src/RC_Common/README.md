@@ -15,7 +15,7 @@ Gemeinsame Basis aller ESP32-Firmwaren (RC-Multiswitch C3/S3, Multiswitch Basis 
 
 | Datei | Inhalt |
 |---|---|
-| `CRSF_ESP32/` | CRSF-Bibliothek 1.1.0 mit Router für die Modulkette (eigene README) |
+| `CRSF_ESP32/` | CRSF-Bibliothek 1.1.1 mit Router für die Modulkette (eigene README) |
 | `uart_roles.*` | Rollen der Zusatz-UARTs, überall gleich nummeriert: 0 Aus, 1 CRSF, 2 S.Port, 3 GPS, 4 Raw. Baudratenliste mit „Auto“, Umrechnung alter NVS-Werte |
 | `uart_ports.*` | Startet Port B/C nach Rolle (CRSF-Router, S.Port, GPS, Raw), erkennt doppelte Rollen, sendet die Telemetrie |
 | `sport_lipo.*` | FrSky S.Port Master für FLVSS/MLVSS → CRSF-Zellspannungen |
@@ -41,5 +41,6 @@ Im Namensraum des jeweiligen Projekts: `ssid pass wip dnam madr wfauto wftmo wfa
 | 1.1.0 | 1.1.0 | GPS-Baudrate „Auto“ (wie Betaflight/INAV): Eintrag 0 der Baudratenliste, Vorgabe für die Rolle GPS. Bei „Auto“ nehmen die anderen Rollen ihre Protokoll-Baudrate. Alte GPS-Einstellungen werden bei der Übernahme auf „Auto“ gesetzt. `rcFillBaud()` in `/rc_common.js` |
 | 1.2.0 | 1.1.0 | Einstellungs-Backups im Flash (`config_backup.*`, `rcBackup*()` in `/rc_common.js`). `rcOtaUpload()` nimmt einen optionalen Schritt vor dem Upload (automatisches Backup) |
 | 1.2.1 | 1.1.0 | Lua: lange Auswahlfelder (über 55 Byte) werden Chunk für Chunk beantwortet, wie vom Sender angefragt. Außerdem hatte jeder Chunk ein überzähliges Byte vor der CRC. Vorher kam immer Chunk 0, solche Felder und ihr Ordner erschienen im ELRS-Lua nicht. Zuerst im CRSF-Router S3 (v0.3.4), die anderen Kopien folgen |
+| 1.2.2 | 1.1.1 | Adresskonflikt mit Port: `getDuplicatePorts()` (Bit 0 = B, Bit 1 = C), rein additiv. Zuerst im CRSF-Router S3 (v0.3.6), die anderen Kopien folgen |
 
 Voraussetzung: ESP32 Arduino Core 3.x (Multiswitch: arduino-cli `esp32:esp32@3.0.7`, Soundmodule: PlatformIO pioarduino 51.03.07 = Core 3.0.7).

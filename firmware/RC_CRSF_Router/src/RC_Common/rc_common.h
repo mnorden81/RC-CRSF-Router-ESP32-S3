@@ -9,6 +9,6 @@
 #ifndef RC_COMMON_H
 #define RC_COMMON_H
 
-#define RC_COMMON_VERSION "1.2.1"
+#define RC_COMMON_VERSION "1.2.2"
 
 #endif
