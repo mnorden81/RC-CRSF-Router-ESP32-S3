@@ -187,6 +187,29 @@ void test_lua_folder_children_in_insert_order() {
     TEST_ASSERT_EQUAL(0, (int)io.tx.size());
 }
 
+// RC_Common 1.3.0: view() blendet ein Feld aus -> Bit 7 im Datentyp,
+// gilt nur fuer diese eine Antwort
+static void viewHidden(uint8_t, LuaView& v, char*) { v.hidden = true; }
+
+void test_lua_hidden_sets_type_bit7_once() {
+    LuaMenu m(g_items, 16); buildMenu(m);
+    LuaItem* it = const_cast<LuaItem*>(m.find(2));
+    it->view = viewHidden;
+    CRSF crsf;
+    FakeStream io;
+    crsf.attach_stream(&io);
+    TEST_ASSERT_TRUE(m.send(crsf, 2));
+    TEST_ASSERT_TRUE(io.tx.size() > 8);
+    TEST_ASSERT_EQUAL_HEX8(0x80 | 0x00, io.tx[8]);     // UINT8 + versteckt
+    io.tx.clear();
+    TEST_ASSERT_TRUE(m.send(crsf, 3));                  // Auswahl, sichtbar
+    TEST_ASSERT_EQUAL_HEX8(0x09, io.tx[8]);
+    io.tx.clear();
+    TEST_ASSERT_TRUE(m.send(crsf, 1));                  // Ordner, sichtbar
+    TEST_ASSERT_EQUAL_HEX8(0x0B, io.tx[8]);
+    it->view = nullptr;
+}
+
 // ── WLAN-Failsafe ───────────────────────────────────────────────────────
 
 void test_wifi_failsafe_switches_on_after_timeout() {
@@ -328,6 +351,7 @@ int main(int, char**) {
     RUN_TEST(test_lua_write_clamps_and_rejects);
     RUN_TEST(test_lua_view_override);
     RUN_TEST(test_lua_folder_children_in_insert_order);
+    RUN_TEST(test_lua_hidden_sets_type_bit7_once);
     RUN_TEST(test_wifi_failsafe_switches_on_after_timeout);
     RUN_TEST(test_wifi_failsafe_resets_on_signal_and_respects_flags);
     RUN_TEST(test_led_modes_crsf);

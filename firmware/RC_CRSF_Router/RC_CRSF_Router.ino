@@ -66,9 +66,13 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 6
-static const char*   FW_VERSION       = "0.3.6";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 36
+#define FW_PATCH 7
+static const char*   FW_VERSION       = "0.3.7";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 37
+// v0.3.7: Lua uebersichtlicher (RC_Common 1.3.0, wie RC-Multiswitch-Sound
+//         v1.05): Ordner "Ports" zeigt die Rollen, Baudrate bei Port "Aus"
+//         und "Spannung Korrektur" bei "Spannung senden: Aus" ausgeblendet
+//         (CRSF hidden, Feld-IDs bleiben).
 // v0.3.6: Adresskonflikt deutlicher: LED blau Doppelblitz (gelb nur noch
 //         bei doppelter Port-Rolle), Lua/WebUI/USB zeigen Port B oder C.
 //         CRSF_ESP32 1.1.1 (getDuplicatePorts).
@@ -141,12 +145,20 @@ static void    luaSetRole(uint8_t a, uint8_t v) {
     cfg.common.role[a] = v; cfgMarkDirty();
 }
 static uint8_t luaGetBaud(uint8_t a)            { return uartBaudToIndex(cfg.common.baud[a]); }
+// v0.3.7: Rollen im Ordnernamen, Baudrate nur bei aktivem Port sichtbar
+static void luaShowPortsFolder(uint8_t, LuaView& v, char* buf) {
+    snprintf(buf, LUA_VIEW_BUF, "Ports (B %s, C %s)", uartRoleName(luaGetRole(0)), uartRoleName(luaGetRole(1)));
+    v.name = buf;
+}
+static void luaViewBaud(uint8_t a, LuaView& v, char*) { if (luaGetRole(a) == 0) v.hidden = true; }
 static void    luaSetBaud(uint8_t a, uint8_t v) { cfg.common.baud[a] = uartBaudFromIndex(v); cfgMarkDirty(); }
 static uint8_t luaGetAddr(uint8_t)              { return (uint8_t)constrain(cfg.common.moduleAddr, 0, 15); }
 static void    luaSetAddr(uint8_t, uint8_t v)   { cfg.common.moduleAddr = v; crsf.setDeviceAddress(ownAddr()); cfgMarkDirty(); }
 
 static uint8_t luaGetVMode(uint8_t)             { return cfg.voltMode; }
 static void    luaSetVMode(uint8_t, uint8_t v)  { cfg.voltMode = v; cfgMarkDirty(); }
+// v0.3.7: Korrektur nur sichtbar, wenn die Spannung gesendet wird
+static void    luaViewVCorr(uint8_t, LuaView& v, char*) { if (cfg.voltMode == 0) v.hidden = true; }
 static uint8_t luaGetVCorr(uint8_t)             { return (uint8_t)(cfg.voltCorr + 5); }
 static void    luaSetVCorr(uint8_t, uint8_t v)  { cfg.voltCorr = (int8_t)v - 5; cfgMarkDirty(); }
 static uint8_t luaGetTSend(uint8_t)             { return cfg.tempSend ? 1 : 0; }
@@ -183,15 +195,15 @@ static void buildLuaMenu() {
     m.clear();
     m.folder(0, 0, "");
     m.info(1, 0, "Version", "")->view = luaShowVersion;
-    m.folder(2, 0, "Ports (nach Neustart)");
-    m.select(3, 2, "Port B Rolle", uartRoleOptions(), luaGetRole, luaSetRole, 0);
-    m.select(4, 2, "Port B Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 0);
-    m.select(5, 2, "Port C Rolle", uartRoleOptions(), luaGetRole, luaSetRole, 1);
-    m.select(6, 2, "Port C Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 1);
+    m.folder(2, 0, "Ports (nach Neustart)")->view = luaShowPortsFolder;
+    m.select(3, 2, "Port B Rolle (Neustart)", uartRoleOptions(), luaGetRole, luaSetRole, 0);
+    m.select(4, 2, "Port B Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 0)->view = luaViewBaud;
+    m.select(5, 2, "Port C Rolle (Neustart)", uartRoleOptions(), luaGetRole, luaSetRole, 1);
+    m.select(6, 2, "Port C Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 1)->view = luaViewBaud;
     m.u8(7, 0, "Modul Adresse", 0, 15, "", luaGetAddr, luaSetAddr);
     m.folder(8, 0, "Telemetrie");
     m.select(9, 8, "Spannung senden", "Aus;als RxBt;als Zellen", luaGetVMode, luaSetVMode);
-    m.select(10, 8, "Spannung Korrektur", "-0.5V;-0.4V;-0.3V;-0.2V;-0.1V;0.0V;+0.1V;+0.2V;+0.3V;+0.4V;+0.5V", luaGetVCorr, luaSetVCorr);
+    m.select(10, 8, "Spannung Korrektur", "-0.5V;-0.4V;-0.3V;-0.2V;-0.1V;0.0V;+0.1V;+0.2V;+0.3V;+0.4V;+0.5V", luaGetVCorr, luaSetVCorr)->view = luaViewVCorr;
     m.info(11, 8, "Empfaengerspannung", "")->view = luaShowVolt;
     m.select(12, 8, "Temperatur senden", AUS_EIN, luaGetTSend, luaSetTSend);
     m.info(13, 8, "Temperatur", "")->view = luaShowTemp;
