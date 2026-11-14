@@ -127,6 +127,7 @@ Alle Ports vollduplex. Rolle (Aus/CRSF/S.Port/GPS/Raw) und Baudrate von Port B u
 | `firmware/` | Firmware (Gerüst v0.2.0, später Arduino-Sketch) |
 | `hardware/` | Schaltplan und Platine (folgt) |
 | `docs/` | Projektbeschreibung (`PROJEKT.md`), später Abnahmeprüfung |
+| `pruefstand/Funk_Bruecke/` | Prüfstand „Module per Funk verbinden“ (ESP-NOW statt CRSF-Kabel), siehe dortige README |
 
 ## Verwandte Projekte
 
