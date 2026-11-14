@@ -225,7 +225,7 @@ void CRSF::set_crsf_channel(uint8_t ch, uint16_t value) {
         channels[ch] = value;
 }
 
-#ifdef ARDUINO
+#if defined(ARDUINO) && defined(ESP32)   // nur ESP32 (RP2350-Auszug nutzt den Rest, seit 1.3.0)
 void CRSF::init_crsf(HardwareSerial *serialPort, uint8_t rxPin, uint8_t txPin, uint32_t baud) {
   // serialPort wird tatsaechlich verwendet (nicht hart "&Serial2"), damit
   // eine zweite Instanz nicht ebenfalls auf Serial2 landet. nullptr faellt
@@ -486,7 +486,7 @@ void CRSF::read_packets(uint8_t debug) {
 //  Frames ohne Extended-Header (Typ < 0x28, z.B. RC-Kanaele 0x16 und
 //  Link-Statistik 0x14) haben keine Zieladresse und gehen immer weiter.
 // ════════════════════════════════════════════════════════════════════
-#ifdef ARDUINO
+#if defined(ARDUINO) && defined(ESP32)   // nur ESP32 (RP2350-Auszug nutzt den Rest, seit 1.3.0)
 void CRSF::init_router(HardwareSerial* portB, uint8_t bRx, uint8_t bTx,
                        HardwareSerial* portC, uint8_t cRx, uint8_t cTx,
                        uint32_t bBaud, uint32_t cBaud) {

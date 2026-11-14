@@ -43,7 +43,7 @@ class CRSF
 public:
 
     CRSF();
-#ifdef ARDUINO
+#if defined(ARDUINO) && defined(ESP32)   // nur ESP32 (RP2350-Auszug nutzt den Rest, seit 1.3.0)
     // 4. Parameter "baud" (Default = BAUD_RATE/420000). serialPort ==
     // nullptr faellt auf Serial1 zurueck (der ESP32-C3 hat kein Serial2).
     // Seit 1.1.0 mit groesseren UART-Puffern (vor begin()).
