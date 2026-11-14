@@ -131,6 +131,11 @@ public:
     uint8_t getParamWriteIndex() const { return paramWriteIndex; }
     uint8_t getParamWriteValue() const { return paramWriteValue; }
     uint8_t getParamReadSource() const { return paramReadSource; }
+    // Naechste Parameter-Antwort als "versteckt" markieren (Bit 7 im
+    // Datentyp, CRSF-Spezifikation). Das ELRS-Lua zeigt solche Felder nicht
+    // an, laedt sie aber weiter nach. Gilt nur fuer die naechste Antwort
+    // (RC_Common 1.3.0).
+    void setNextParamHidden(bool hidden) { paramHidden = hidden; }
     // Eigene CRSF-Geraeteadresse (0xC0..0xCF, abgeleitet aus der WM-Adresse)
     void          setDeviceAddress(uint8_t a) { deviceAddress = a; }
     uint8_t       getDeviceAddress() const { return deviceAddress; }
@@ -205,6 +210,8 @@ private:
     uint8_t paramReadChunk  = 0;   // Angefragter Chunk (RC_Common 1.2.1)
     uint8_t paramWriteIndex = 0;   // Zu schreibender Parameter-Index
     uint8_t paramWriteValue = 0;   // Zu schreibender Wert
+    bool    paramHidden      = false; // RC_Common 1.3.0, siehe setNextParamHidden()
+    uint8_t takeParamHiddenFlag() { uint8_t f = paramHidden ? 0x80 : 0x00; paramHidden = false; return f; }
     uint8_t paramReadSource  = 0xEF; // Source des PARAMETER_READ -> Destination der Antwort
     uint8_t deviceAddress = CRSF_ADDRESS_FLIGHT_CONTROLLER; // eigene CRSF-Adresse (0xC0..0xCF aus WM-Adresse; Default 0xC8)
     unsigned long pingReceivedTime = 0; // Zeitpunkt des letzten Broadcast-Ping (fuer Slot-Delay)

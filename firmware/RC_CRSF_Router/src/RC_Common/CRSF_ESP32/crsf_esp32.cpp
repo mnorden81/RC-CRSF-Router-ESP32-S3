@@ -746,7 +746,7 @@ void CRSF::send_param_response_CRSF_UINT8(uint8_t param_id, uint8_t parent, cons
     packet[6] = 0x00; // chunks remaining, 0 chunks remaining after this one
     
     packet[7] = parent; // Parent folder
-    packet[8] = CRSF_UINT8; // Data type
+    packet[8] = CRSF_UINT8 | takeParamHiddenFlag(); // Data type (+ Bit 7 versteckt)
 
     strcpy((char*)&packet[9], name); // Name
 
@@ -897,7 +897,7 @@ void CRSF::send_param_response_CRSF_TEXT_SELECTION(
     uint16_t p = 0;
 
     payload[p++] = parent;
-    payload[p++] = CRSF_TEXT_SELECTION;
+    payload[p++] = CRSF_TEXT_SELECTION | takeParamHiddenFlag();   // + Bit 7 versteckt
 
     // Name
     strcpy((char*)&payload[p], name);
@@ -1038,7 +1038,7 @@ void CRSF::send_param_response_CRSF_FOLDER(uint8_t param_id, uint8_t parent, con
     packet[6] = 0x00; // chunks remaining, 0 chunks remaining after this one
     
     packet[7] = parent; // Parent folder
-    packet[8] = CRSF_FOLDER; // Data type
+    packet[8] = CRSF_FOLDER | takeParamHiddenFlag(); // Data type (+ Bit 7 versteckt)
 
     strcpy((char*)&packet[9], name); // Name
 
@@ -1079,7 +1079,7 @@ void CRSF::send_param_response_CRSF_INFO(uint8_t param_id, uint8_t parent, const
     packet[6] = 0x00; // chunks remaining, 0 chunks remaining after this one
     
     packet[7] = parent; // Parent folder
-    packet[8] = CRSF_INFO; // Data type
+    packet[8] = CRSF_INFO | takeParamHiddenFlag(); // Data type (+ Bit 7 versteckt)
 
     strcpy((char*)&packet[9], name); // Name
     strcpy((char*)&packet[9 + len_name], info); // Info
