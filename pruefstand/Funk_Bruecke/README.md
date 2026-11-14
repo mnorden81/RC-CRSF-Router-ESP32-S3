@@ -1,6 +1,6 @@
 # Prüfstand: Module per Funk verbinden (Funk-Brücke)
 
-Autor: PiperPilot · Version 0.1.0 · noch nicht auf Hardware getestet
+Autor: PiperPilot · Version 0.1.1 · noch nicht auf Hardware getestet
 
 Hier testen wir, ob die Module statt per Kabel auch per Funk (ESP-NOW) zuverlässig CRSF bekommen. Die bestehende Firmware der Module bleibt dabei **unverändert**.
 

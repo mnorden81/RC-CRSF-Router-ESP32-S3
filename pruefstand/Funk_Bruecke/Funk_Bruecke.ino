@@ -37,6 +37,7 @@
  *
  * Versionen:
  *   0.1.0  Erster Pruefstand: durchsichtige Bruecke, Messwerte, WebUI
+ *   0.1.1  C3: BOOT-Taste ist GPIO9 (nicht GPIO0)
  */
 
 #include <WiFi.h>
@@ -48,7 +49,7 @@
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.0"
+#define FW_VERSION "0.1.1"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -59,6 +60,7 @@
   #define PIN_LED      21
   #define LED_WS2812   1
   #define LED_RGB_DEFAULT true    // S3-Zero: Rot/Gruen vertauscht
+  #define PIN_BOOT     0
 #elif defined(CONFIG_IDF_TARGET_ESP32C3)
   // ESP32-C3 Pro Mini / SuperMini: wie Port A des Sound Mini C3.
   // LED an GPIO8 (WS2812) ist noch nicht bestaetigt.
@@ -68,6 +70,7 @@
   #define PIN_LED      8
   #define LED_WS2812   1
   #define LED_RGB_DEFAULT false
+  #define PIN_BOOT     9          // BOOT-Taste beim C3 = GPIO9
 #else
   // Klassischer ESP32 (DevKit): UART2-Standardpins, blaue LED an GPIO2
   #define BOARD_NAME   "ESP32"
@@ -76,9 +79,9 @@
   #define PIN_LED      2
   #define LED_WS2812   0
   #define LED_RGB_DEFAULT false
+  #define PIN_BOOT     0
 #endif
 
-#define PIN_BOOT       0
 #define BOOT_HOLD_MS   2000
 #define LINK_TIMEOUT_MS 200      // so lange ohne Funk-Paket = Aussetzer
 #define PING_PERIOD_MS 200
