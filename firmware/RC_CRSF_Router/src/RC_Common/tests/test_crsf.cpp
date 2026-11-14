@@ -320,6 +320,7 @@ static void test_router_forwards_up_and_detects_duplicate_address(void) {
     TEST_ASSERT_TRUE(io.tx == info);
     TEST_ASSERT_EQUAL_UINT32(1, crsf.getFwdUp());
     TEST_ASSERT_TRUE(crsf.isDuplicateAddress());
+    TEST_ASSERT_EQUAL_UINT8(1, crsf.getDuplicatePorts());   // 1.1.1: Port B
 }
 
 static void test_router_never_forwards_between_b_and_c(void) {

@@ -24,13 +24,14 @@
    Eigene WM-Moduladresse 0-15 -> CRSF-Adresse 0xC0+Adresse, Vorgabe 15
    (0xCF). Mehrere Router im Modell bekommen verschiedene Adressen (z. B.
    15, 14, 13). Meldet ein Geraet weiter hinten dieselbe Adresse, blinkt
-   die LED gelb (Doppelblitz).
+   die LED blau (Doppelblitz); Lua "Status" > "Adresskonflikt" zeigt den Port.
 
    ── Status-LED (WS2812, GPIO21) ───────────────────────────────────────
    gruen langsam      RC-Signal in Ordnung
    violett langsam    RC-Signal in Ordnung, WLAN an
    rot schnell        kein RC-Signal / Failsafe
-   gelb Doppelblitz   Adresskonflikt oder doppelte Port-Rolle
+   blau Doppelblitz   Adresskonflikt (Geraet an Port B/C mit gleicher Adresse)
+   gelb Doppelblitz   doppelte Port-Rolle
    violett schnell    kein RC-Signal, WLAN an
    blau blinkend      3 s nach dem Start: BOOT druecken = WLAN an
    Im Betrieb: BOOT 2 s halten = WLAN an/aus
@@ -65,9 +66,12 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 5
-static const char*   FW_VERSION       = "0.3.5";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 35
+#define FW_PATCH 6
+static const char*   FW_VERSION       = "0.3.6";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 36
+// v0.3.6: Adresskonflikt deutlicher: LED blau Doppelblitz (gelb nur noch
+//         bei doppelter Port-Rolle), Lua/WebUI/USB zeigen Port B oder C.
+//         CRSF_ESP32 1.1.1 (getDuplicatePorts).
 // v0.3.5: Port A auf RX44/TX43 (Serial0), Port C auf Serial2 (7/8). GPIO14/15
 //         liegen beim S3-Zero nicht auf der Stiftleiste (nur Loetpads).
 // v0.3.4: Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8
@@ -153,7 +157,12 @@ static void luaShowCount(uint8_t a, LuaView& v, char* buf) {
     uint32_t n = a == 0 ? crsf.getFwdDown() : a == 1 ? crsf.getFwdUp() : a == 2 ? crsf.getFwdDropped() : crsf.getDownCrcErrors();
     snprintf(buf, LUA_VIEW_BUF, "%lu", (unsigned long)n); v.text = buf;
 }
-static void luaShowDup(uint8_t, LuaView& v, char*) { v.text = crsf.isDuplicateAddress() ? "ja" : "nein"; }
+static const char* dupText() {
+    if (!crsf.isDuplicateAddress()) return "nein";
+    uint8_t p = crsf.getDuplicatePorts();
+    return p == 3 ? "ja, Port B+C" : p == 2 ? "ja, Port C" : "ja, Port B";
+}
+static void luaShowDup(uint8_t, LuaView& v, char*) { v.text = dupText(); }
 
 static uint8_t luaGetWifiNow(uint8_t)             { return webApActive() ? 1 : 0; }
 static void    luaSetWifiNow(uint8_t, uint8_t v)  { if (v) webEnableAP(); else webDisableAP(); }
@@ -223,7 +232,8 @@ static void updateLed() {
     static unsigned long start = 0;
     if (mode != ledMode) { ledMode = mode; start = now; }
     uint8_t r = 0, g = 0, b = 0;
-    if (mode == SLED_DOUBLE)    { r = 40; g = 28; ledText = "gelb Doppelblitz: Adresskonflikt oder doppelte Port-Rolle"; }
+    if (mode == SLED_DOUBLE && crsf.isDuplicateAddress()) { b = 60; ledText = "blau Doppelblitz: Adresskonflikt"; }
+    else if (mode == SLED_DOUBLE) { r = 40; g = 28; ledText = "gelb Doppelblitz: doppelte Port-Rolle"; }
     else if (mode == SLED_FAST && webApActive()) { r = 24; b = 40; ledText = "violett schnell: kein RC-Signal, WLAN an"; }
     else if (mode == SLED_FAST) { r = 40;         ledText = "rot schnell: kein RC-Signal"; }
     else if (webApActive())     { r = 24; b = 40; ledText = "violett: RC-Signal OK, WLAN an"; }
@@ -274,6 +284,7 @@ static void printUplinkDiag(unsigned long now) {
     Serial.printf("Port A (RX %d / TX %d): Bytes %u, gueltige Frames %u, CRC-Fehler %u, RC %s\n",
                   PIN_UPLINK_RX, PIN_UPLINK_TX, (unsigned)crsf.getRawBytesRx(), (unsigned)crsf.getValidFrames(),
                   (unsigned)crsf.getCrcErrors(), busOk ? "ja" : "nein");
+    if (crsf.isDuplicateAddress()) Serial.printf("Adresskonflikt: %s\n", dupText());
 }
 
 // ======== Telemetrie ==================================================
@@ -314,6 +325,7 @@ String routerStatusJson() {
          ",\"rxCrc\":" + String(crsf.getCrcErrors());
     j += ",\"moduleAddr\":" + String(cfg.common.moduleAddr);
     j += ",\"dupAddr\":" + String(crsf.isDuplicateAddress() ? "true" : "false");
+    j += ",\"dupPorts\":" + String(crsf.getDuplicatePorts());
     j += ",\"ledText\":\"" + String(ledText) + "\"";
     j += ",\"volt\":" + String(rxVolt, 2) + ",\"temp\":" + String(espTemp, 1);
     j += ",\"uptime\":" + String(millis() / 1000);

@@ -553,8 +553,10 @@ void CRSF::routeFromDown(CrsfPort& p) {
         if (!parseByte(p, (uint8_t)p.ser->read())) continue;
         uint8_t n = p.rxLen + 2;
         // Doppelte Adresse: ein Modul weiter hinten meldet unsere Adresse
-        if (p.rx[2] == CRSF_FRAMETYPE_DEVICE_INFO && n > 5 && p.rx[4] == deviceAddress)
+        if (p.rx[2] == CRSF_FRAMETYPE_DEVICE_INFO && n > 5 && p.rx[4] == deviceAddress) {
             duplicateAddress = true;
+            duplicatePorts |= (&p == &portC_) ? 2 : 1;
+        }
         if (portA_.ser) enqueue(portA_, p.rx, n);
         fwdUp++;
     }
