@@ -113,7 +113,7 @@ function poll(){fetch('/api/status').then(function(r){return r.json();}).then(fu
   $('hdr').textContent='v'+s.version+' · '+hex(s.moduleAddr);
   kv('st',[['RC-Signal',s.rc?'<b class="ok">OK</b>':'<b class="bad">kein Signal</b>'],['Link-Qualität',s.lq+' %'],['Eingang (Port A)',s.rxBytes+' Bytes · '+s.rxFrames+' Frames · '+s.rxCrc+' CRC-Fehler'],
     ['Status-LED',s.ledText],['Moduladresse','WM '+s.moduleAddr+' · '+hex(s.moduleAddr)],
-    ['Adresskonflikt',s.dupAddr?'<b class="bad">ja, ein Gerät weiter hinten hat dieselbe Adresse</b>':'nein'],
+    ['Adresskonflikt',s.dupAddr?'<b class="bad">ja, ein Gerät an Port '+(s.dupPorts==3?'B und C':s.dupPorts==2?'C':'B')+' hat dieselbe Adresse</b>':'nein'],
     ['Empfängerspannung',s.volt.toFixed(2)+' V'],['Temperatur',s.temp.toFixed(1)+' °C'],['Laufzeit',Math.floor(s.uptime/60)+' min']]);
   kv('fw',[['Frames runter',s.fwdDown],['Frames hoch',s.fwdUp],['Verworfen',s.dropped],['CRC-Fehler von unten',s.crcDown]]);
   kv('pact',s.ports.map(function(p){return [p.name,rcRoleName(p.role)+(p.role?' · '+rcBaudName(p.baud):'')+(p.duplicate?' <span class="warn">(Rolle schon auf Port B)</span>':'')];}));

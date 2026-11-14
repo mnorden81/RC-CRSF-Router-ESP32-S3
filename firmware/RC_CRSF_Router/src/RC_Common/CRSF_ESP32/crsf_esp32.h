@@ -5,7 +5,7 @@
 // Teil von RC_Common: jedes Projekt traegt eine identische Kopie des
 // Ordners RC_Common; Aenderungen immer in allen Kopien nachziehen und
 // CRSF_ESP32_VERSION hochzaehlen. Aenderungshistorie: README.md hier.
-#define CRSF_ESP32_VERSION "1.1.0"
+#define CRSF_ESP32_VERSION "1.1.1"
 
 #include "crsf_platform.h"
 #include "crsf_esp32_protocol.h"
@@ -71,6 +71,8 @@ public:
     uint32_t getDownCrcErrors() const { return downCrcErrors; }
     // Ein Modul weiter hinten in der Kette meldet unsere Adresse
     bool     isDuplicateAddress() const { return duplicateAddress; }
+    // 1.1.1: an welchem Port kam die doppelte Adresse (Bit 0 = B, Bit 1 = C)
+    uint8_t  getDuplicatePorts() const { return duplicatePorts; }
 
     void read_packets(uint8_t debug);
     void send_packets(byte* buffer, size_t length, uint8_t debug);
@@ -176,6 +178,7 @@ private:
     uint32_t fwdDropped    = 0;
     uint32_t downCrcErrors = 0;
     bool     duplicateAddress = false;
+    uint8_t  duplicatePorts = 0;
     unsigned long lastRcFrameMs = 0;
 
     // serial_data/linkStats/info sind Member (nicht global), damit mehrere
