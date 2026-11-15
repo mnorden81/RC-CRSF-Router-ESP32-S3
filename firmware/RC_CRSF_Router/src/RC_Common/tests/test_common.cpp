@@ -269,6 +269,39 @@ void test_led_patterns() {
     TEST_ASSERT_TRUE(statusLedOn(SLED_DOUBLE, 300));
     TEST_ASSERT_FALSE(statusLedOn(SLED_DOUBLE, 600));
     TEST_ASSERT_FALSE(statusLedOn(SLED_OFF, 0));
+    TEST_ASSERT_TRUE(statusLedOn(SLED_BLIP, 1099));
+    TEST_ASSERT_FALSE(statusLedOn(SLED_BLIP, 1100));
+    TEST_ASSERT_FALSE(statusLedOn(SLED_BLIP, 1999));
+    TEST_ASSERT_TRUE(statusLedBootOn(0));
+    TEST_ASSERT_FALSE(statusLedBootOn(250));
+    TEST_ASSERT_TRUE(statusLedBootOn(500));
+}
+
+// 1.4.0: einheitliche Farben
+void test_led_look() {
+    StatusLedLook l = statusLedLook(SLED_SLOW, false, false);       // gruen langsam
+    TEST_ASSERT_EQUAL_UINT8(SLED_SLOW, l.pattern);
+    TEST_ASSERT_TRUE(l.g > 0 && l.r == 0 && l.b == 0);
+    l = statusLedLook(SLED_FAST, false, false);                     // rot schnell
+    TEST_ASSERT_EQUAL_UINT8(SLED_FAST, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.g == 0 && l.b == 0);
+    l = statusLedLook(SLED_OFF, false, false);                      // rot Aufblitzen
+    TEST_ASSERT_EQUAL_UINT8(SLED_BLIP, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.g == 0 && l.b == 0);
+    l = statusLedLook(SLED_DOUBLE, true, true);                     // blau, WLAN egal
+    TEST_ASSERT_EQUAL_UINT8(SLED_DOUBLE, l.pattern);
+    TEST_ASSERT_TRUE(l.b > 0 && l.r == 0 && l.g == 0);
+    l = statusLedLook(SLED_DOUBLE, false, false);                   // gelb
+    TEST_ASSERT_TRUE(l.r > 0 && l.g > 0 && l.b == 0);
+    l = statusLedLook(SLED_SLOW, false, true);                      // violett langsam
+    TEST_ASSERT_EQUAL_UINT8(SLED_SLOW, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.b > 0 && l.g == 0);
+    l = statusLedLook(SLED_OFF, false, true);                       // violett Aufblitzen
+    TEST_ASSERT_EQUAL_UINT8(SLED_BLIP, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.b > 0 && l.g == 0);
+    TEST_ASSERT_EQUAL_STRING("blau Doppelblitz: Adresskonflikt", statusLedText(SLED_DOUBLE, true, false));
+    TEST_ASSERT_EQUAL_STRING("rot Aufblitzen: kein Signal", statusLedText(SLED_OFF, false, false));
+    TEST_ASSERT_EQUAL_STRING("aus: kein Signal", statusLedText(SLED_OFF, false, false, false));
 }
 
 // ── Einstellungen ───────────────────────────────────────────────────────
@@ -357,6 +390,7 @@ int main(int, char**) {
     RUN_TEST(test_led_modes_crsf);
     RUN_TEST(test_led_modes_sbus);
     RUN_TEST(test_led_patterns);
+    RUN_TEST(test_led_look);
     RUN_TEST(test_settings_sanitize);
     RUN_TEST(test_backup_names);
     RUN_TEST(test_backup_rejects_foreign_names);
