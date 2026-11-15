@@ -27,12 +27,13 @@
    die LED blau (Doppelblitz); Lua "Status" > "Adresskonflikt" zeigt den Port.
 
    ── Status-LED (WS2812, GPIO21) ───────────────────────────────────────
+   (gleiches Schema in allen Modulen, RC_Common 1.4.0)
    gruen langsam      RC-Signal in Ordnung
-   violett langsam    RC-Signal in Ordnung, WLAN an
-   rot schnell        kein RC-Signal / Failsafe
+   rot schnell        Frames kommen, aber Failsafe / kein RC-Link
+   rot Aufblitzen     kein Signal an Port A (kurz alle 1 s)
    blau Doppelblitz   Adresskonflikt (Geraet an Port B/C mit gleicher Adresse)
    gelb Doppelblitz   doppelte Port-Rolle
-   violett schnell    kein RC-Signal, WLAN an
+   violett            statt gruen/rot, wenn das WLAN an ist (Muster bleibt)
    blau blinkend      3 s nach dem Start: BOOT druecken = WLAN an
    Im Betrieb: BOOT 2 s halten = WLAN an/aus
 
@@ -66,9 +67,13 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 7
-static const char*   FW_VERSION       = "0.3.7";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 37
+#define FW_PATCH 8
+static const char*   FW_VERSION       = "0.3.8";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 38
+// v0.3.8: Status-LED einheitlich mit allen Modulen (RC_Common 1.4.0):
+//         kein Signal = rot Aufblitzen (vorher rot schnell), rot schnell =
+//         Frames, aber Failsafe / kein RC-Link, WLAN an = violett auch beim
+//         Aufblitzen. Farben/Muster jetzt aus RC_Common (StatusLed).
 // v0.3.7: Lua uebersichtlicher (RC_Common 1.3.0, wie RC-Multiswitch-Sound
 //         v1.05): Ordner "Ports" zeigt die Rollen, Baudrate bei Port "Aus"
 //         und "Spannung Korrektur" bei "Spannung senden: Aus" ausgeblendet
@@ -221,13 +226,10 @@ static void buildLuaMenu() {
     m.select(27, 0, "LED Reihenfolge", "RGB (S3-Zero);GRB", luaGetLedRgb, luaSetLedRgb);
 }
 
-// ======== Status-LED (Farben) =========================================
-// Muster aus RC_Common (statusLedMode/statusLedOn), Farbe hier im Projekt.
-// neopixelWrite sendet GRB; die LED des S3-Zero erwartet RGB -> Rot/Gruen tauschen
-static void ledWrite(uint8_t r, uint8_t g, uint8_t b) {
-    if (cfg.ledRgb) neopixelWrite(PIN_STATUS_LED, g, r, b);
-    else            neopixelWrite(PIN_STATUS_LED, r, g, b);
-}
+// ======== Status-LED ==================================================
+// Farben und Muster aus RC_Common 1.4.0 (gleiches Schema in allen Modulen).
+// Gelber Doppelblitz heisst hier: doppelte Port-Rolle.
+static StatusLed statusLed;
 
 static void updateLed() {
     unsigned long now = millis();
@@ -239,21 +241,12 @@ static void updateLed() {
     in.lastRcFrameMs = crsf.getLastRcFrameMs();
     in.linkStatsMs   = ls.lastUpdate;
     in.uplinkLQ      = ls.uplinkLQ;
-    uint8_t mode = statusLedMode(in, now);
-    if (mode == SLED_OFF) mode = SLED_FAST;   // kein Signal: rot schnell statt dunkel
-    static unsigned long start = 0;
-    if (mode != ledMode) { ledMode = mode; start = now; }
-    uint8_t r = 0, g = 0, b = 0;
-    if (mode == SLED_DOUBLE && crsf.isDuplicateAddress()) { b = 60; ledText = "blau Doppelblitz: Adresskonflikt"; }
-    else if (mode == SLED_DOUBLE) { r = 40; g = 28; ledText = "gelb Doppelblitz: doppelte Port-Rolle"; }
-    else if (mode == SLED_FAST && webApActive()) { r = 24; b = 40; ledText = "violett schnell: kein RC-Signal, WLAN an"; }
-    else if (mode == SLED_FAST) { r = 40;         ledText = "rot schnell: kein RC-Signal"; }
-    else if (webApActive())     { r = 24; b = 40; ledText = "violett: RC-Signal OK, WLAN an"; }
-    else                        { g = 40;         ledText = "gruen: RC-Signal OK"; }
-    bool on = statusLedOn(mode, now - start);
-    static int8_t last = -1; static uint32_t lastRgb = 0;
-    uint32_t rgb = on ? ((uint32_t)r << 16 | (uint32_t)g << 8 | b) : 0;
-    if ((int8_t)on != last || rgb != lastRgb) { ledWrite(r * on, g * on, b * on); last = on; lastRgb = rgb; }
+    ledMode = statusLedMode(in, now);
+    bool dup = crsf.isDuplicateAddress();
+    ledText = (ledMode == SLED_DOUBLE && !dup) ? "gelb Doppelblitz: doppelte Port-Rolle"
+                                               : statusLedText(ledMode, dup, webApActive());
+    statusLed.setRgbOrder(cfg.ledRgb);
+    statusLed.update(ledMode, now, dup, webApActive());
 }
 
 // BOOT-Taste: 3 s nach dem Start druecken = WLAN an (LED blinkt blau)
@@ -265,10 +258,10 @@ static bool waitForWifiButton() {
             delay(30);
             if (digitalRead(PIN_BOOT_BUTTON) == LOW) { pressed = true; break; }
         }
-        ledWrite(0, 0, ((millis() - start) / 250) % 2 ? 40 : 0);
+        statusLed.showBootWindow(millis() - start);
         delay(10);
     }
-    ledWrite(0, 0, 0);
+    statusLed.writeRgb(0, 0, 0);
     return pressed;
 }
 
@@ -368,6 +361,8 @@ void setup() {
     Serial.begin(115200);
     cfgLoad();
     pinMode(PIN_BOOT_BUTTON, INPUT_PULLUP);
+    statusLed.begin(PIN_STATUS_LED, true);
+    statusLed.setRgbOrder(cfg.ledRgb);
 
     crsf.init_crsf(UPLINK_SERIAL, PIN_UPLINK_RX, PIN_UPLINK_TX);
     crsf.setDeviceAddress(ownAddr());
