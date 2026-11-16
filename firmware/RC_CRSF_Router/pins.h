@@ -4,7 +4,7 @@
 /*
  * pins.h  -  CRSF-Router (ESP32-S3-Zero)
  *
- * Belegung (v0.3.5, an Martins Board geprueft): Port A (Eingang) RX44/TX43
+ * Belegung (v0.3.5, am Board geprueft): Port A (Eingang) RX44/TX43
  * (rechte Leiste oben, TX/RX), Port B 5/6 (links unten), Port C 7/8 (rechts
  * unten). GPIO14/15/16 sind beim S3-Zero nur Loetpads. Auswahlregeln fuer den ESP32-S3:
  *   - GPIO 26-37 sind beim S3FH4R2 durch Flash/PSRAM belegt (tabu)

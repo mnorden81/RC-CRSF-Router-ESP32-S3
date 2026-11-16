@@ -1,5 +1,7 @@
 # CRSF-Router (ESP32-S3)
 
+> **Archiv:** erster Projektentwurf vom 31.10.2026 (Gerüst v0.2.0), wird nicht mehr aktualisiert. Aktueller Stand: [README.md](../README.md) und [CHANGELOG.md](../CHANGELOG.md).
+
 Stand: 31.10.2026 · Firmware v0.2.0 · Status: Gerüst, nicht kompiliert, nicht geflasht, nicht getestet
 
 ## Ziel

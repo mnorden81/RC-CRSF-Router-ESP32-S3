@@ -70,31 +70,7 @@
 #define FW_PATCH 8
 static const char*   FW_VERSION       = "0.3.8";
 static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 38
-// v0.3.8: Status-LED einheitlich mit allen Modulen (RC_Common 1.4.0):
-//         kein Signal = rot Aufblitzen (vorher rot schnell), rot schnell =
-//         Frames, aber Failsafe / kein RC-Link, WLAN an = violett auch beim
-//         Aufblitzen. Farben/Muster jetzt aus RC_Common (StatusLed).
-// v0.3.7: Lua uebersichtlicher (RC_Common 1.3.0, wie RC-Multiswitch-Sound
-//         v1.05): Ordner "Ports" zeigt die Rollen, Baudrate bei Port "Aus"
-//         und "Spannung Korrektur" bei "Spannung senden: Aus" ausgeblendet
-//         (CRSF hidden, Feld-IDs bleiben).
-// v0.3.6: Adresskonflikt deutlicher: LED blau Doppelblitz (gelb nur noch
-//         bei doppelter Port-Rolle), Lua/WebUI/USB zeigen Port B oder C.
-//         CRSF_ESP32 1.1.1 (getDuplicatePorts).
-// v0.3.5: Port A auf RX44/TX43 (Serial0), Port C auf Serial2 (7/8). GPIO14/15
-//         liegen beim S3-Zero nicht auf der Stiftleiste (nur Loetpads).
-// v0.3.4: Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8
-//         (Fehler bei v0.3.1 war ein Wackler in der Verkabelung).
-//         RC_Common 1.2.1: Lua-Felder ueber 55 Byte (Port-Baudraten) werden
-//         Chunk fuer Chunk beantwortet - vorher fehlte der Ordner "Ports" im Lua.
-// v0.3.3: Pins wieder wie v0.3.0 (A 5/6, B 7/8, C 44/43). Fehlersuche Eingang: Bytes/Frames/CRC von Port A auf USB (alle 2 s) und in
-//         der WebUI; BOOT jederzeit 2 s halten = WLAN an/aus; ohne Signal und
-//         mit WLAN blinkt die LED violett schnell statt rot.
-// v0.3.2: LED-Farben korrigiert (S3-Zero: Rot/Gruen vertauscht), Lua "LED Reihenfolge".
-// v0.3.1: neue Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8.
-// v0.3.0: erste Firmware auf RC_Common 1.2.0 (Router, Rollen, Lua, WebUI,
-//         Status-LED in Farben, Spannung/Temperatur als Telemetrie).
-// v0.2.0: Geruest mit eigenem CRSF-Code (firmware/v0.2.0-geruest, ungetestet).
+// Versionsgeschichte: siehe CHANGELOG.md im Hauptordner des Repos.
 
 static HardwareSerial* const UPLINK_SERIAL = &Serial0;
 static HardwareSerial* const PORTB_SERIAL  = &Serial1;
