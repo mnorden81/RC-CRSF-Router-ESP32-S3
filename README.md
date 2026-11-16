@@ -2,7 +2,7 @@
 
 CRSF-Verteiler für ELRS-Empfänger auf einem **ESP32-S3-Zero**. Der Router hängt an einem freien CRSF-Port des Empfängers und verteilt CRSF auf zwei weitere Ports (Port B und Port C). So lassen sich mehrere Module an einem Empfänger betreiben und verketten: RC-Multiswitch C3/S3, Multiswitch Basis (Ziege-One), Soundmodule, G030-Multiswitch und weitere Router.
 
-> **Stand:** Firmware v0.3.8 (Status-LED mit demselben Schema wie alle anderen Module) als fertiger Arduino-Sketch auf Basis von **RC_Common 1.4.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
+> **Stand:** Firmware v0.3.8 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.4.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`. Alle Versionen: [CHANGELOG.md](CHANGELOG.md).
 
 ![Testaufbau: TX16S zeigt CRSF-Router@15 und zwei Sound-Minis hinter dem Router](docs/bilder/testaufbau.jpg)
 
@@ -126,9 +126,10 @@ Alle Ports vollduplex. Rolle (Aus/CRSF/S.Port/GPS/Raw) und Baudrate von Port B u
 
 | Ordner | Inhalt |
 |---|---|
-| `firmware/` | Firmware (Gerüst v0.2.0, später Arduino-Sketch) |
+| `firmware/` | Firmware: Arduino-Sketch `RC_CRSF_Router/` und das erste Gerüst v0.2.0 |
 | `hardware/` | Schaltplan und Platine (folgt) |
-| `docs/` | Projektbeschreibung (`PROJEKT.md`), später Abnahmeprüfung |
+| `CHANGELOG.md` | alle Versionen mit Änderungen |
+| `docs/` | erster Projektentwurf (`PROJEKT.md`, Archiv), Bilder |
 
 ## Verwandte Projekte
 
