@@ -45,6 +45,7 @@
  *          geprueft); neuer NVS-Schluessel, damit alte Einstellung nicht greift
  *   0.1.5  UART pro loop()-Durchlauf begrenzen (Bruecke am Empfaenger hing
  *          sonst im Lesen fest: LED dauerhaft an, kein Ping, keine WebUI)
+ *   0.1.6  Pull-up am CRSF-RX, damit ein offener Pin keine Stoerdaten liefert
  */
 
 #include <WiFi.h>
@@ -52,11 +53,12 @@
 #include <Preferences.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include <driver/gpio.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.5"
+#define FW_VERSION "0.1.6"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -558,6 +560,9 @@ void setup() {
     rxQueue = xQueueCreate(32, sizeof(RxItem));
     Serial1.setRxBufferSize(1024);
     Serial1.begin(cfg.baud, SERIAL_8N1, PIN_CRSF_RX, PIN_CRSF_TX);
+    // Pull-up am RX: ohne angeschlossenes Geraet liest ein offener Pin sonst
+    // Stoerungen als Daten (UART-Ruhepegel ist HIGH)
+    gpio_pullup_en((gpio_num_t)PIN_CRSF_RX);
 
     radioBegin();
     snprintf(apName, sizeof(apName), "Funk-Bruecke-%02X%02X", myMac[4], myMac[5]);
