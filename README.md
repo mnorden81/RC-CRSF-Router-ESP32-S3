@@ -2,13 +2,13 @@
 
 CRSF-Verteiler für ELRS-Empfänger auf einem **ESP32-S3-Zero**. Der Router hängt an einem freien CRSF-Port des Empfängers und verteilt CRSF auf zwei weitere Ports (Port B und Port C). So lassen sich mehrere Module an einem Empfänger betreiben und verketten: RC-Multiswitch C3/S3, Multiswitch Basis (Ziege-One), Soundmodule, G030-Multiswitch und weitere Router.
 
-> **Stand:** Firmware v0.3.6 (Adresskonflikt blau, Port im Lua/WebUI) als fertiger Arduino-Sketch auf Basis von **RC_Common 1.2.2** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`.
+> **Stand:** Firmware v0.3.8 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.4.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`. Alle Versionen: [CHANGELOG.md](CHANGELOG.md).
 
 ![Testaufbau: TX16S zeigt CRSF-Router@15 und zwei Sound-Minis hinter dem Router](docs/bilder/testaufbau.jpg)
 
 *Testaufbau 05.11.2026: ELRS-Empfänger, S3-Router und zwei Sound-Minis. Der Sender (TX16S) zeigt unter „Other Devices“ den Router „CRSF-Router@15“ und die Module „Sound-Mini@0“ und „Sound-Mini@1“ hinter ihm.*
 
-## Funktionen (v0.3.6)
+## Funktionen (v0.3.8)
 
 - Weiterleitung Empfänger → Port B/C und zurück, Ketten über mehrere Stufen (RC_Common-Router). Nach unten geht alles außer Anfragen an die eigene Adresse, nach oben alles, zwischen B und C nie.
 - Jeder Port wählbar: Aus / CRSF / S.Port / GPS / Raw (Lua und WebUI), gilt nach Neustart
@@ -22,14 +22,16 @@ Geplant für später: Geräteliste und Telemetrie-Übersicht über den ganzen Ba
 
 ## Status-LED
 
+Gleiches Schema in allen Modulen (seit v0.3.8 / RC_Common 1.4.0):
+
 | LED | Bedeutung |
 |---|---|
 | grün langsam | RC-Signal in Ordnung |
-| violett langsam | RC-Signal in Ordnung, WLAN an |
-| rot schnell | kein RC-Signal / Failsafe |
-| violett schnell | kein RC-Signal, WLAN an |
-| blau Doppelblitz | Adresskonflikt: ein Gerät an Port B oder C hat dieselbe Adresse (ab v0.3.6; Lua „Status“ → „Adresskonflikt“ zeigt den Port). Adresse ändern, dann Neustart. |
+| rot schnell | Frames kommen, aber Failsafe / kein RC-Link |
+| rot Aufblitzen (kurz alle 1 s) | kein Signal an Port A |
+| blau Doppelblitz | Adresskonflikt: ein Gerät an Port B oder C hat dieselbe Adresse (Lua „Status“ → „Adresskonflikt“ zeigt den Port). Adresse ändern, dann Neustart. |
 | gelb Doppelblitz | doppelte Port-Rolle |
+| violett statt grün/rot | WLAN ist an (Muster bleibt: langsam = OK, schnell = Failsafe, Aufblitzen = kein Signal) |
 | blau blinkend (3 s nach dem Start) | jetzt BOOT drücken = WLAN an |
 
 Beim ESP32-S3-Zero sind Rot und Grün in der LED vertauscht. Die Vorgabe „LED Reihenfolge: RGB (S3-Zero)“ im Lua-Menü gleicht das aus; bei einem Board mit Standard-WS2812 dort „GRB“ wählen.
@@ -124,9 +126,10 @@ Alle Ports vollduplex. Rolle (Aus/CRSF/S.Port/GPS/Raw) und Baudrate von Port B u
 
 | Ordner | Inhalt |
 |---|---|
-| `firmware/` | Firmware (Gerüst v0.2.0, später Arduino-Sketch) |
+| `firmware/` | Firmware: Arduino-Sketch `RC_CRSF_Router/` und das erste Gerüst v0.2.0 |
 | `hardware/` | Schaltplan und Platine (folgt) |
-| `docs/` | Projektbeschreibung (`PROJEKT.md`), später Abnahmeprüfung |
+| `CHANGELOG.md` | alle Versionen mit Änderungen |
+| `docs/` | erster Projektentwurf (`PROJEKT.md`, Archiv), Bilder |
 | `pruefstand/Funk_Bruecke/` | Prüfstand „Module per Funk verbinden“ (ESP-NOW statt CRSF-Kabel), siehe dortige README |
 
 ## Verwandte Projekte

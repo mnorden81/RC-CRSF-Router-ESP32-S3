@@ -27,12 +27,13 @@
    die LED blau (Doppelblitz); Lua "Status" > "Adresskonflikt" zeigt den Port.
 
    ── Status-LED (WS2812, GPIO21) ───────────────────────────────────────
+   (gleiches Schema in allen Modulen, RC_Common 1.4.0)
    gruen langsam      RC-Signal in Ordnung
-   violett langsam    RC-Signal in Ordnung, WLAN an
-   rot schnell        kein RC-Signal / Failsafe
+   rot schnell        Frames kommen, aber Failsafe / kein RC-Link
+   rot Aufblitzen     kein Signal an Port A (kurz alle 1 s)
    blau Doppelblitz   Adresskonflikt (Geraet an Port B/C mit gleicher Adresse)
    gelb Doppelblitz   doppelte Port-Rolle
-   violett schnell    kein RC-Signal, WLAN an
+   violett            statt gruen/rot, wenn das WLAN an ist (Muster bleibt)
    blau blinkend      3 s nach dem Start: BOOT druecken = WLAN an
    Im Betrieb: BOOT 2 s halten = WLAN an/aus
 
@@ -66,26 +67,10 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 3
-#define FW_PATCH 6
-static const char*   FW_VERSION       = "0.3.6";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 36
-// v0.3.6: Adresskonflikt deutlicher: LED blau Doppelblitz (gelb nur noch
-//         bei doppelter Port-Rolle), Lua/WebUI/USB zeigen Port B oder C.
-//         CRSF_ESP32 1.1.1 (getDuplicatePorts).
-// v0.3.5: Port A auf RX44/TX43 (Serial0), Port C auf Serial2 (7/8). GPIO14/15
-//         liegen beim S3-Zero nicht auf der Stiftleiste (nur Loetpads).
-// v0.3.4: Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8
-//         (Fehler bei v0.3.1 war ein Wackler in der Verkabelung).
-//         RC_Common 1.2.1: Lua-Felder ueber 55 Byte (Port-Baudraten) werden
-//         Chunk fuer Chunk beantwortet - vorher fehlte der Ordner "Ports" im Lua.
-// v0.3.3: Pins wieder wie v0.3.0 (A 5/6, B 7/8, C 44/43). Fehlersuche Eingang: Bytes/Frames/CRC von Port A auf USB (alle 2 s) und in
-//         der WebUI; BOOT jederzeit 2 s halten = WLAN an/aus; ohne Signal und
-//         mit WLAN blinkt die LED violett schnell statt rot.
-// v0.3.2: LED-Farben korrigiert (S3-Zero: Rot/Gruen vertauscht), Lua "LED Reihenfolge".
-// v0.3.1: neue Pins: Port A (Eingang) RX14/TX15, Port B RX5/TX6, Port C RX7/TX8.
-// v0.3.0: erste Firmware auf RC_Common 1.2.0 (Router, Rollen, Lua, WebUI,
-//         Status-LED in Farben, Spannung/Temperatur als Telemetrie).
-// v0.2.0: Geruest mit eigenem CRSF-Code (firmware/v0.2.0-geruest, ungetestet).
+#define FW_PATCH 8
+static const char*   FW_VERSION       = "0.3.8";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 38
+// Versionsgeschichte: siehe CHANGELOG.md im Hauptordner des Repos.
 
 static HardwareSerial* const UPLINK_SERIAL = &Serial0;
 static HardwareSerial* const PORTB_SERIAL  = &Serial1;
@@ -141,12 +126,20 @@ static void    luaSetRole(uint8_t a, uint8_t v) {
     cfg.common.role[a] = v; cfgMarkDirty();
 }
 static uint8_t luaGetBaud(uint8_t a)            { return uartBaudToIndex(cfg.common.baud[a]); }
+// v0.3.7: Rollen im Ordnernamen, Baudrate nur bei aktivem Port sichtbar
+static void luaShowPortsFolder(uint8_t, LuaView& v, char* buf) {
+    snprintf(buf, LUA_VIEW_BUF, "Ports (B %s, C %s)", uartRoleName(luaGetRole(0)), uartRoleName(luaGetRole(1)));
+    v.name = buf;
+}
+static void luaViewBaud(uint8_t a, LuaView& v, char*) { if (luaGetRole(a) == 0) v.hidden = true; }
 static void    luaSetBaud(uint8_t a, uint8_t v) { cfg.common.baud[a] = uartBaudFromIndex(v); cfgMarkDirty(); }
 static uint8_t luaGetAddr(uint8_t)              { return (uint8_t)constrain(cfg.common.moduleAddr, 0, 15); }
 static void    luaSetAddr(uint8_t, uint8_t v)   { cfg.common.moduleAddr = v; crsf.setDeviceAddress(ownAddr()); cfgMarkDirty(); }
 
 static uint8_t luaGetVMode(uint8_t)             { return cfg.voltMode; }
 static void    luaSetVMode(uint8_t, uint8_t v)  { cfg.voltMode = v; cfgMarkDirty(); }
+// v0.3.7: Korrektur nur sichtbar, wenn die Spannung gesendet wird
+static void    luaViewVCorr(uint8_t, LuaView& v, char*) { if (cfg.voltMode == 0) v.hidden = true; }
 static uint8_t luaGetVCorr(uint8_t)             { return (uint8_t)(cfg.voltCorr + 5); }
 static void    luaSetVCorr(uint8_t, uint8_t v)  { cfg.voltCorr = (int8_t)v - 5; cfgMarkDirty(); }
 static uint8_t luaGetTSend(uint8_t)             { return cfg.tempSend ? 1 : 0; }
@@ -183,15 +176,15 @@ static void buildLuaMenu() {
     m.clear();
     m.folder(0, 0, "");
     m.info(1, 0, "Version", "")->view = luaShowVersion;
-    m.folder(2, 0, "Ports (nach Neustart)");
-    m.select(3, 2, "Port B Rolle", uartRoleOptions(), luaGetRole, luaSetRole, 0);
-    m.select(4, 2, "Port B Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 0);
-    m.select(5, 2, "Port C Rolle", uartRoleOptions(), luaGetRole, luaSetRole, 1);
-    m.select(6, 2, "Port C Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 1);
+    m.folder(2, 0, "Ports (nach Neustart)")->view = luaShowPortsFolder;
+    m.select(3, 2, "Port B Rolle (Neustart)", uartRoleOptions(), luaGetRole, luaSetRole, 0);
+    m.select(4, 2, "Port B Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 0)->view = luaViewBaud;
+    m.select(5, 2, "Port C Rolle (Neustart)", uartRoleOptions(), luaGetRole, luaSetRole, 1);
+    m.select(6, 2, "Port C Baudrate", uartBaudOptions(), luaGetBaud, luaSetBaud, 1)->view = luaViewBaud;
     m.u8(7, 0, "Modul Adresse", 0, 15, "", luaGetAddr, luaSetAddr);
     m.folder(8, 0, "Telemetrie");
     m.select(9, 8, "Spannung senden", "Aus;als RxBt;als Zellen", luaGetVMode, luaSetVMode);
-    m.select(10, 8, "Spannung Korrektur", "-0.5V;-0.4V;-0.3V;-0.2V;-0.1V;0.0V;+0.1V;+0.2V;+0.3V;+0.4V;+0.5V", luaGetVCorr, luaSetVCorr);
+    m.select(10, 8, "Spannung Korrektur", "-0.5V;-0.4V;-0.3V;-0.2V;-0.1V;0.0V;+0.1V;+0.2V;+0.3V;+0.4V;+0.5V", luaGetVCorr, luaSetVCorr)->view = luaViewVCorr;
     m.info(11, 8, "Empfaengerspannung", "")->view = luaShowVolt;
     m.select(12, 8, "Temperatur senden", AUS_EIN, luaGetTSend, luaSetTSend);
     m.info(13, 8, "Temperatur", "")->view = luaShowTemp;
@@ -209,13 +202,10 @@ static void buildLuaMenu() {
     m.select(27, 0, "LED Reihenfolge", "RGB (S3-Zero);GRB", luaGetLedRgb, luaSetLedRgb);
 }
 
-// ======== Status-LED (Farben) =========================================
-// Muster aus RC_Common (statusLedMode/statusLedOn), Farbe hier im Projekt.
-// neopixelWrite sendet GRB; die LED des S3-Zero erwartet RGB -> Rot/Gruen tauschen
-static void ledWrite(uint8_t r, uint8_t g, uint8_t b) {
-    if (cfg.ledRgb) neopixelWrite(PIN_STATUS_LED, g, r, b);
-    else            neopixelWrite(PIN_STATUS_LED, r, g, b);
-}
+// ======== Status-LED ==================================================
+// Farben und Muster aus RC_Common 1.4.0 (gleiches Schema in allen Modulen).
+// Gelber Doppelblitz heisst hier: doppelte Port-Rolle.
+static StatusLed statusLed;
 
 static void updateLed() {
     unsigned long now = millis();
@@ -227,21 +217,12 @@ static void updateLed() {
     in.lastRcFrameMs = crsf.getLastRcFrameMs();
     in.linkStatsMs   = ls.lastUpdate;
     in.uplinkLQ      = ls.uplinkLQ;
-    uint8_t mode = statusLedMode(in, now);
-    if (mode == SLED_OFF) mode = SLED_FAST;   // kein Signal: rot schnell statt dunkel
-    static unsigned long start = 0;
-    if (mode != ledMode) { ledMode = mode; start = now; }
-    uint8_t r = 0, g = 0, b = 0;
-    if (mode == SLED_DOUBLE && crsf.isDuplicateAddress()) { b = 60; ledText = "blau Doppelblitz: Adresskonflikt"; }
-    else if (mode == SLED_DOUBLE) { r = 40; g = 28; ledText = "gelb Doppelblitz: doppelte Port-Rolle"; }
-    else if (mode == SLED_FAST && webApActive()) { r = 24; b = 40; ledText = "violett schnell: kein RC-Signal, WLAN an"; }
-    else if (mode == SLED_FAST) { r = 40;         ledText = "rot schnell: kein RC-Signal"; }
-    else if (webApActive())     { r = 24; b = 40; ledText = "violett: RC-Signal OK, WLAN an"; }
-    else                        { g = 40;         ledText = "gruen: RC-Signal OK"; }
-    bool on = statusLedOn(mode, now - start);
-    static int8_t last = -1; static uint32_t lastRgb = 0;
-    uint32_t rgb = on ? ((uint32_t)r << 16 | (uint32_t)g << 8 | b) : 0;
-    if ((int8_t)on != last || rgb != lastRgb) { ledWrite(r * on, g * on, b * on); last = on; lastRgb = rgb; }
+    ledMode = statusLedMode(in, now);
+    bool dup = crsf.isDuplicateAddress();
+    ledText = (ledMode == SLED_DOUBLE && !dup) ? "gelb Doppelblitz: doppelte Port-Rolle"
+                                               : statusLedText(ledMode, dup, webApActive());
+    statusLed.setRgbOrder(cfg.ledRgb);
+    statusLed.update(ledMode, now, dup, webApActive());
 }
 
 // BOOT-Taste: 3 s nach dem Start druecken = WLAN an (LED blinkt blau)
@@ -253,10 +234,10 @@ static bool waitForWifiButton() {
             delay(30);
             if (digitalRead(PIN_BOOT_BUTTON) == LOW) { pressed = true; break; }
         }
-        ledWrite(0, 0, ((millis() - start) / 250) % 2 ? 40 : 0);
+        statusLed.showBootWindow(millis() - start);
         delay(10);
     }
-    ledWrite(0, 0, 0);
+    statusLed.writeRgb(0, 0, 0);
     return pressed;
 }
 
@@ -356,6 +337,8 @@ void setup() {
     Serial.begin(115200);
     cfgLoad();
     pinMode(PIN_BOOT_BUTTON, INPUT_PULLUP);
+    statusLed.begin(PIN_STATUS_LED, true);
+    statusLed.setRgbOrder(cfg.ledRgb);
 
     crsf.init_crsf(UPLINK_SERIAL, PIN_UPLINK_RX, PIN_UPLINK_TX);
     crsf.setDeviceAddress(ownAddr());

@@ -53,3 +53,9 @@ jobs:
           name: crsf-router-s3-firmware
           # *.ino.bin = OTA-Update, *.merged.bin = Komplett-Image ab 0x0 (USB)
           path: build/*.bin
+      # Gegenprobe mit dem neueren Core (Arduino IDE nutzt 3.3.12), nur Kompiliertest
+      - name: Kompilieren mit esp32-Core 3.3.12
+        run: |
+          arduino-cli core install esp32:esp32@3.3.12
+          arduino-cli compile --warnings default \
+            --fqbn "esp32:esp32:esp32s3:CDCOnBoot=cdc,USBMode=hwcdc,FlashSize=4M,PartitionScheme=default" "$SKETCH"

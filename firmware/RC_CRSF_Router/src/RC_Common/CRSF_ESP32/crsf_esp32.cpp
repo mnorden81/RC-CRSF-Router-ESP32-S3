@@ -225,7 +225,7 @@ void CRSF::set_crsf_channel(uint8_t ch, uint16_t value) {
         channels[ch] = value;
 }
 
-#ifdef ARDUINO
+#if defined(ARDUINO) && defined(ESP32)   // nur ESP32 (RP2350-Auszug nutzt den Rest, seit 1.3.0)
 void CRSF::init_crsf(HardwareSerial *serialPort, uint8_t rxPin, uint8_t txPin, uint32_t baud) {
   // serialPort wird tatsaechlich verwendet (nicht hart "&Serial2"), damit
   // eine zweite Instanz nicht ebenfalls auf Serial2 landet. nullptr faellt
@@ -486,7 +486,7 @@ void CRSF::read_packets(uint8_t debug) {
 //  Frames ohne Extended-Header (Typ < 0x28, z.B. RC-Kanaele 0x16 und
 //  Link-Statistik 0x14) haben keine Zieladresse und gehen immer weiter.
 // ════════════════════════════════════════════════════════════════════
-#ifdef ARDUINO
+#if defined(ARDUINO) && defined(ESP32)   // nur ESP32 (RP2350-Auszug nutzt den Rest, seit 1.3.0)
 void CRSF::init_router(HardwareSerial* portB, uint8_t bRx, uint8_t bTx,
                        HardwareSerial* portC, uint8_t cRx, uint8_t cTx,
                        uint32_t bBaud, uint32_t cBaud) {
@@ -746,7 +746,7 @@ void CRSF::send_param_response_CRSF_UINT8(uint8_t param_id, uint8_t parent, cons
     packet[6] = 0x00; // chunks remaining, 0 chunks remaining after this one
     
     packet[7] = parent; // Parent folder
-    packet[8] = CRSF_UINT8; // Data type
+    packet[8] = CRSF_UINT8 | takeParamHiddenFlag(); // Data type (+ Bit 7 versteckt)
 
     strcpy((char*)&packet[9], name); // Name
 
@@ -897,7 +897,7 @@ void CRSF::send_param_response_CRSF_TEXT_SELECTION(
     uint16_t p = 0;
 
     payload[p++] = parent;
-    payload[p++] = CRSF_TEXT_SELECTION;
+    payload[p++] = CRSF_TEXT_SELECTION | takeParamHiddenFlag();   // + Bit 7 versteckt
 
     // Name
     strcpy((char*)&payload[p], name);
@@ -1038,7 +1038,7 @@ void CRSF::send_param_response_CRSF_FOLDER(uint8_t param_id, uint8_t parent, con
     packet[6] = 0x00; // chunks remaining, 0 chunks remaining after this one
     
     packet[7] = parent; // Parent folder
-    packet[8] = CRSF_FOLDER; // Data type
+    packet[8] = CRSF_FOLDER | takeParamHiddenFlag(); // Data type (+ Bit 7 versteckt)
 
     strcpy((char*)&packet[9], name); // Name
 
@@ -1079,7 +1079,7 @@ void CRSF::send_param_response_CRSF_INFO(uint8_t param_id, uint8_t parent, const
     packet[6] = 0x00; // chunks remaining, 0 chunks remaining after this one
     
     packet[7] = parent; // Parent folder
-    packet[8] = CRSF_INFO; // Data type
+    packet[8] = CRSF_INFO | takeParamHiddenFlag(); // Data type (+ Bit 7 versteckt)
 
     strcpy((char*)&packet[9], name); // Name
     strcpy((char*)&packet[9 + len_name], info); // Info

@@ -187,6 +187,29 @@ void test_lua_folder_children_in_insert_order() {
     TEST_ASSERT_EQUAL(0, (int)io.tx.size());
 }
 
+// RC_Common 1.3.0: view() blendet ein Feld aus -> Bit 7 im Datentyp,
+// gilt nur fuer diese eine Antwort
+static void viewHidden(uint8_t, LuaView& v, char*) { v.hidden = true; }
+
+void test_lua_hidden_sets_type_bit7_once() {
+    LuaMenu m(g_items, 16); buildMenu(m);
+    LuaItem* it = const_cast<LuaItem*>(m.find(2));
+    it->view = viewHidden;
+    CRSF crsf;
+    FakeStream io;
+    crsf.attach_stream(&io);
+    TEST_ASSERT_TRUE(m.send(crsf, 2));
+    TEST_ASSERT_TRUE(io.tx.size() > 8);
+    TEST_ASSERT_EQUAL_HEX8(0x80 | 0x00, io.tx[8]);     // UINT8 + versteckt
+    io.tx.clear();
+    TEST_ASSERT_TRUE(m.send(crsf, 3));                  // Auswahl, sichtbar
+    TEST_ASSERT_EQUAL_HEX8(0x09, io.tx[8]);
+    io.tx.clear();
+    TEST_ASSERT_TRUE(m.send(crsf, 1));                  // Ordner, sichtbar
+    TEST_ASSERT_EQUAL_HEX8(0x0B, io.tx[8]);
+    it->view = nullptr;
+}
+
 // ── WLAN-Failsafe ───────────────────────────────────────────────────────
 
 void test_wifi_failsafe_switches_on_after_timeout() {
@@ -246,6 +269,39 @@ void test_led_patterns() {
     TEST_ASSERT_TRUE(statusLedOn(SLED_DOUBLE, 300));
     TEST_ASSERT_FALSE(statusLedOn(SLED_DOUBLE, 600));
     TEST_ASSERT_FALSE(statusLedOn(SLED_OFF, 0));
+    TEST_ASSERT_TRUE(statusLedOn(SLED_BLIP, 1099));
+    TEST_ASSERT_FALSE(statusLedOn(SLED_BLIP, 1100));
+    TEST_ASSERT_FALSE(statusLedOn(SLED_BLIP, 1999));
+    TEST_ASSERT_TRUE(statusLedBootOn(0));
+    TEST_ASSERT_FALSE(statusLedBootOn(250));
+    TEST_ASSERT_TRUE(statusLedBootOn(500));
+}
+
+// 1.4.0: einheitliche Farben
+void test_led_look() {
+    StatusLedLook l = statusLedLook(SLED_SLOW, false, false);       // gruen langsam
+    TEST_ASSERT_EQUAL_UINT8(SLED_SLOW, l.pattern);
+    TEST_ASSERT_TRUE(l.g > 0 && l.r == 0 && l.b == 0);
+    l = statusLedLook(SLED_FAST, false, false);                     // rot schnell
+    TEST_ASSERT_EQUAL_UINT8(SLED_FAST, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.g == 0 && l.b == 0);
+    l = statusLedLook(SLED_OFF, false, false);                      // rot Aufblitzen
+    TEST_ASSERT_EQUAL_UINT8(SLED_BLIP, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.g == 0 && l.b == 0);
+    l = statusLedLook(SLED_DOUBLE, true, true);                     // blau, WLAN egal
+    TEST_ASSERT_EQUAL_UINT8(SLED_DOUBLE, l.pattern);
+    TEST_ASSERT_TRUE(l.b > 0 && l.r == 0 && l.g == 0);
+    l = statusLedLook(SLED_DOUBLE, false, false);                   // gelb
+    TEST_ASSERT_TRUE(l.r > 0 && l.g > 0 && l.b == 0);
+    l = statusLedLook(SLED_SLOW, false, true);                      // violett langsam
+    TEST_ASSERT_EQUAL_UINT8(SLED_SLOW, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.b > 0 && l.g == 0);
+    l = statusLedLook(SLED_OFF, false, true);                       // violett Aufblitzen
+    TEST_ASSERT_EQUAL_UINT8(SLED_BLIP, l.pattern);
+    TEST_ASSERT_TRUE(l.r > 0 && l.b > 0 && l.g == 0);
+    TEST_ASSERT_EQUAL_STRING("blau Doppelblitz: Adresskonflikt", statusLedText(SLED_DOUBLE, true, false));
+    TEST_ASSERT_EQUAL_STRING("rot Aufblitzen: kein Signal", statusLedText(SLED_OFF, false, false));
+    TEST_ASSERT_EQUAL_STRING("aus: kein Signal", statusLedText(SLED_OFF, false, false, false));
 }
 
 // ── Einstellungen ───────────────────────────────────────────────────────
@@ -328,11 +384,13 @@ int main(int, char**) {
     RUN_TEST(test_lua_write_clamps_and_rejects);
     RUN_TEST(test_lua_view_override);
     RUN_TEST(test_lua_folder_children_in_insert_order);
+    RUN_TEST(test_lua_hidden_sets_type_bit7_once);
     RUN_TEST(test_wifi_failsafe_switches_on_after_timeout);
     RUN_TEST(test_wifi_failsafe_resets_on_signal_and_respects_flags);
     RUN_TEST(test_led_modes_crsf);
     RUN_TEST(test_led_modes_sbus);
     RUN_TEST(test_led_patterns);
+    RUN_TEST(test_led_look);
     RUN_TEST(test_settings_sanitize);
     RUN_TEST(test_backup_names);
     RUN_TEST(test_backup_rejects_foreign_names);
