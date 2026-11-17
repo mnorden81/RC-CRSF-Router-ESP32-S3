@@ -40,6 +40,7 @@
  *   0.1.1  C3: BOOT-Taste ist GPIO9 (nicht GPIO0)
  *   0.1.2  Neustart der Gegenstelle erkennen: Paketnummer neu synchronisieren
  *          (vorher verwarf die andere Bruecke danach alle Daten als "alt")
+ *   0.1.3  WLAN-Blitz blau laenger (0,3 s) und heller
  */
 
 #include <WiFi.h>
@@ -51,7 +52,7 @@
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.2"
+#define FW_VERSION "0.1.3"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -487,7 +488,7 @@ static void updateLed() {
     bool rc = (lastRcRadioMs && now - lastRcRadioMs <= LINK_TIMEOUT_MS) ||
               (lastRcUartMs  && now - lastRcUartMs  <= LINK_TIMEOUT_MS);
     uint8_t c;   // 0 aus, 1 gruen, 2 rot, 3 blau
-    if (wifiApOn && (now % 2000) < 100)  c = 3;
+    if (wifiApOn && (now % 2000) < 300)  c = 3;   // 0,3 s blau = WLAN an
     else if (!link)                      c = (now % 1000) < 500 ? 2 : 0;
     else if (rc)                         c = (now % 1000) < 500 ? 1 : 0;
     else                                 c = (now % 200)  < 100 ? 1 : 0;
@@ -497,7 +498,7 @@ static void updateLed() {
     switch (c) {
         case 1: ledColor(0, B, 0); break;
         case 2: ledColor(B, 0, 0); break;
-        case 3: ledColor(0, 0, B); break;
+        case 3: ledColor(0, 0, 60); break;     // blau heller, sonst kaum sichtbar
         default: ledColor(0, 0, 0);
     }
 }

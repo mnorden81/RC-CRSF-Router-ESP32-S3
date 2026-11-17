@@ -1,6 +1,6 @@
 # Prüfstand: Module per Funk verbinden (Funk-Brücke)
 
-Autor: PiperPilot · Version 0.1.2 · noch nicht auf Hardware getestet
+Autor: PiperPilot · Version 0.1.3 · noch nicht auf Hardware getestet
 
 Hier testen wir, ob die Module statt per Kabel auch per Funk (ESP-NOW) zuverlässig CRSF bekommen. Die bestehende Firmware der Module bleibt dabei **unverändert**.
 
@@ -59,6 +59,8 @@ Die fertigen Dateien baut GitHub automatisch: Reiter **Actions** → „Prüfsta
 | grün blinkt schnell | Funk-Verbindung da, aber keine Kanäle |
 | rot blinkt | keine Funk-Verbindung |
 | kurz blau alle 2 s | WLAN ist an |
+
+Sind Rot und Grün vertauscht (beim Start grün, mit Verbindung rot), in der WebUI „LED-Reihenfolge“ auf **GRB** stellen.
 
 **Einstellungen** (bei beiden Brücken gleich einstellen!)
 
