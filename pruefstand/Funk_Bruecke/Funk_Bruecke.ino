@@ -43,6 +43,8 @@
  *   0.1.3  WLAN-Blitz blau laenger (0,3 s) und heller
  *   0.1.4  LED-Reihenfolge Standard GRB auch beim S3-Zero (an Martins Boards
  *          geprueft); neuer NVS-Schluessel, damit alte Einstellung nicht greift
+ *   0.1.5  UART pro loop()-Durchlauf begrenzen (Bruecke am Empfaenger hing
+ *          sonst im Lesen fest: LED dauerhaft an, kein Ping, keine WebUI)
  */
 
 #include <WiFi.h>
@@ -54,7 +56,7 @@
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.4"
+#define FW_VERSION "0.1.5"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -228,7 +230,10 @@ static void onUartFrame(const uint8_t* f, uint8_t flen) {
 }
 
 static void pollUart() {
-    while (Serial1.available()) {
+    // hoechstens 128 Byte pro Durchlauf, damit loop() (LED, Ping, WebUI)
+    // auch bei dauerndem Datenstrom vom Empfaenger weiterlaeuft
+    int budget = 128;
+    while (budget-- > 0 && Serial1.available()) {
         uint8_t b = Serial1.read();
         uint32_t now = millis();
         if (uPos && now - uLastByteMs > 5) uPos = 0;   // Pause = neues Frame
