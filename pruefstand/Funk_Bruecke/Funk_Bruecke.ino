@@ -38,6 +38,8 @@
  * Versionen:
  *   0.1.0  Erster Pruefstand: durchsichtige Bruecke, Messwerte, WebUI
  *   0.1.1  C3: BOOT-Taste ist GPIO9 (nicht GPIO0)
+ *   0.1.2  Neustart der Gegenstelle erkennen: Paketnummer neu synchronisieren
+ *          (vorher verwarf die andere Bruecke danach alle Daten als "alt")
  */
 
 #include <WiFi.h>
@@ -49,7 +51,7 @@
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.1"
+#define FW_VERSION "0.1.2"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -278,7 +280,11 @@ static void handleRadio(const RxItem& it) {
     case PKT_DATA: {
         if (p->haveSeq) {
             uint16_t d = (uint16_t)(h->seq - p->lastSeq);
-            if (d == 0 || d > 30000) break;                // doppelt/alt
+            if (d == 0) break;                             // doppelt
+            // Nummer springt zurueck = Gegenstelle wurde neu gestartet:
+            // neu synchronisieren statt alles als "alt" zu verwerfen
+            // (v0.1.1 hat dann bis zu Minuten lang nichts weitergegeben).
+            if (d > 30000) d = 1;
             if (d > 1) p->lost += d - 1;
             uint32_t gap = now - p->lastMs;
             if (gap > LINK_TIMEOUT_MS) p->dropouts++;
