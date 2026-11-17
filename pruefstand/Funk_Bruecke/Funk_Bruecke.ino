@@ -41,6 +41,8 @@
  *   0.1.2  Neustart der Gegenstelle erkennen: Paketnummer neu synchronisieren
  *          (vorher verwarf die andere Bruecke danach alle Daten als "alt")
  *   0.1.3  WLAN-Blitz blau laenger (0,3 s) und heller
+ *   0.1.4  LED-Reihenfolge Standard GRB auch beim S3-Zero (an Martins Boards
+ *          geprueft); neuer NVS-Schluessel, damit alte Einstellung nicht greift
  */
 
 #include <WiFi.h>
@@ -52,7 +54,7 @@
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.3"
+#define FW_VERSION "0.1.4"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -62,7 +64,7 @@
   #define PIN_CRSF_TX  6
   #define PIN_LED      21
   #define LED_WS2812   1
-  #define LED_RGB_DEFAULT true    // S3-Zero: Rot/Gruen vertauscht
+  #define LED_RGB_DEFAULT false   // Martins S3-Zero (Bruecken) sind GRB; manche Zero sind RGB -> WebUI
   #define PIN_BOOT     0
 #elif defined(CONFIG_IDF_TARGET_ESP32C3)
   // ESP32-C3 Pro Mini / SuperMini: wie Port A des Sound Mini C3.
@@ -110,7 +112,7 @@ static void loadSettings() {
     cfg.txPower    = prefs.getUChar("txp", 8);
     cfg.baud       = prefs.getUInt("baud", 420000);
     cfg.rcInterval = prefs.getUChar("rcint", 0);
-    cfg.ledRgb     = prefs.getBool("ledrgb", LED_RGB_DEFAULT);
+    cfg.ledRgb     = prefs.getBool("ledrgb2", LED_RGB_DEFAULT);
     cfg.wifiOn     = prefs.getBool("wifi", true);
     prefs.end();
     if (cfg.group == 0) cfg.group = 1;
@@ -125,7 +127,7 @@ static void saveSettings() {
     prefs.putUChar("txp",   cfg.txPower);
     prefs.putUInt ("baud",  cfg.baud);
     prefs.putUChar("rcint", cfg.rcInterval);
-    prefs.putBool ("ledrgb", cfg.ledRgb);
+    prefs.putBool ("ledrgb2", cfg.ledRgb);
     prefs.putBool ("wifi",  cfg.wifiOn);
     prefs.end();
 }
