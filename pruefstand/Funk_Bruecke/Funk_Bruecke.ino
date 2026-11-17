@@ -46,6 +46,8 @@
  *   0.1.5  UART pro loop()-Durchlauf begrenzen (Bruecke am Empfaenger hing
  *          sonst im Lesen fest: LED dauerhaft an, kein Ping, keine WebUI)
  *   0.1.6  Pull-up am CRSF-RX, damit ein offener Pin keine Stoerdaten liefert
+ *   0.1.7  eigene MAC richtig lesen (war 00:00:...): WLAN-Name je Bruecke
+ *          verschieden, Laufzeitmessung (Ping) funktioniert
  */
 
 #include <WiFi.h>
@@ -54,11 +56,12 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <driver/gpio.h>
+#include <esp_mac.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.6"
+#define FW_VERSION "0.1.7"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -353,7 +356,10 @@ static void radioBegin() {
     WiFi.setSleep(false);              // kein Stromsparen = kurze Laufzeit
     esp_wifi_set_channel(cfg.channel, WIFI_SECOND_CHAN_NONE);
     esp_wifi_set_max_tx_power(cfg.txPower * 4);   // Einheit 0,25 dBm
-    WiFi.macAddress(myMac);
+    // WiFi.macAddress() liefert hier beim Core 3.x noch 00:00:..., daher
+    // direkt aus dem WLAN-Treiber (bzw. eFuse) lesen
+    if (esp_wifi_get_mac(WIFI_IF_STA, myMac) != ESP_OK || !(myMac[0] | myMac[1] | myMac[2] | myMac[3] | myMac[4] | myMac[5]))
+        esp_read_mac(myMac, ESP_MAC_WIFI_STA);
     if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW Start fehlgeschlagen"); return; }
     esp_now_register_recv_cb(onRecv);
     esp_now_peer_info_t pi = {};
