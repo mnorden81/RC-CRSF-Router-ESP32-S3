@@ -348,15 +348,13 @@ void CRSF::crsfDataReceive() {
             break;    
 
         case CRSF_FRAMETYPE_COMMAND:
-            // Zieladresse wird genauso geprueft wie bei PING/PARAMETER_READ/
-            // WRITE, damit nicht jedes Kommando auf dem Bus (auch an ein
-            // anderes Geraet adressiert) hier eine Aktion ausloest.
-            // CRSF_ADDRESS_BROADCAST bleibt erlaubt: das WM-Multiswitch-Protokoll
-            // (MWset/MWset4/MWset4m) adressiert bewusst per Broadcast und filtert
-            // erst auf Payload-Ebene nach der eigenen Modul-Adresse (siehe
-            // einkanalFunctionCRSF() in der .ino).
-            if (crfs_buffer[3] != deviceAddress &&
-                crfs_buffer[3] != CRSF_ADDRESS_BROADCAST) break;
+            // 1.2.1: Kommandos wieder unabhaengig von der Zieladresse annehmen
+            // (wie die Ziege-One-Firmware v3.12). WM-Sender (Widget, auch
+            // send_command_MWSET() hier) schicken an eine feste Zieladresse
+            // (z. B. 0xC8), die Module haben eigene Adressen 0xC0+n - mit
+            // Zielpruefung schaltete das Widget nur bei einer Adresse. Gefiltert
+            // wird auf Payload-Ebene nach WM-Code und Modul-Adresse (siehe
+            // einkanalFunctionCRSF() in den Projekten).
             deviceCommandReplyPending = true;
             memcpy(cmdBuffer, crfs_buffer, CRSF_PACKET_SIZE); // Kommando sofort sichern (gegen Ueberschreiben durch Folge-Frames)
 #if DEBUG_CRSF_TYPE 

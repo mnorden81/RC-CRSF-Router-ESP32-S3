@@ -5,7 +5,7 @@
 // Teil von RC_Common: jedes Projekt traegt eine identische Kopie des
 // Ordners RC_Common; Aenderungen immer in allen Kopien nachziehen und
 // CRSF_ESP32_VERSION hochzaehlen. Aenderungshistorie: README.md hier.
-#define CRSF_ESP32_VERSION "1.2.0"
+#define CRSF_ESP32_VERSION "1.2.1"
 
 #include "crsf_platform.h"
 #include "crsf_esp32_protocol.h"

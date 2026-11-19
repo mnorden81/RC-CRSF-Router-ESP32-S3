@@ -2,6 +2,9 @@
 
 Die Version wird bei jeder Änderung erhöht, auch die CRSF „Parameter Version Number“ im DEVICE_INFO. Neueste Version oben.
 
+## v0.4.2 (RC_Common 1.5.2)
+- RC_Common 1.5.2 (CRSF_ESP32 1.2.1): CRSF-Kommandos unabhängig von der Zieladresse. Für den Router ohne Wirkung (er wertet keine WM-Befehle aus), nur damit alle Kopien gleich bleiben.
+
 ## v0.4.1 (RC_Common 1.5.1)
 - RC_Common 1.5.1: `/api/funk` liefert zusätzlich Gesamtzähler (`total`) für die Fehlersuche am Funk-Rückweg. Sonst keine Änderung.
 
