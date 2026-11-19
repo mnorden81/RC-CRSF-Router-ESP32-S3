@@ -131,9 +131,10 @@ Alle Ports vollduplex. Rolle (Aus/CRSF/S.Port/GPS/Raw) und Baudrate von Port B u
 | `hardware/` | Schaltplan und Platine (folgt) |
 | `CHANGELOG.md` | alle Versionen mit Änderungen |
 | `docs/` | erster Projektentwurf (`PROJEKT.md`, Archiv), Bilder |
-| `pruefstand/Funk_Bruecke/` | Prüfstand „Module per Funk verbinden“ (ESP-NOW statt CRSF-Kabel), siehe dortige README |
 
 ## Verwandte Projekte
+
+- **ESP32_ESP-NOW_CRSF-Link** (eigenes Repo, bis v0.1.9 „Funk-Brücke“ unter `pruefstand/` hier): CRSF per ESP-NOW statt Kabel, passt zum Funk-Eingang ab v0.4.0.
 
 - [RC-Multiswitch-ESP32-S3](https://github.com/mnorden81/RC-Multiswitch-ESP32-S3) / [-C3](https://github.com/mnorden81/RC-Multiswitch-ESP32-C3)
 - [ESP32-Sound-Mini-S3](https://github.com/mnorden81/ESP32-Sound-Mini-S3)

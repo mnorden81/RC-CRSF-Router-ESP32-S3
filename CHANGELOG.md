@@ -3,6 +3,7 @@
 Die Version wird bei jeder Änderung erhöht, auch die CRSF „Parameter Version Number“ im DEVICE_INFO. Neueste Version oben.
 
 ## v0.4.0 (RC_Common 1.5.0)
+- Der Prüfstand Funk-Brücke ist jetzt ein eigenes Projekt: Repo ESP32_ESP-NOW_CRSF-Link (`pruefstand/` und dessen CI hier entfernt).
 - Neu: **Funk** (ESP-NOW, aus der Funk-Brücke v0.1.9). Einstellung „Eingang“: Kabel (wie bisher), „Kabel + Funk (Zentrale)“ = CRSF vom Empfänger geht zusätzlich per Funk an Teilnehmer (Router-Port D), „Funk (Teilnehmer)“ = CRSF kommt nur aus dem Funk, Port A bleibt frei, Port B/C verteilen weiter. Passt zum Multiswitch ab v5.01 und zur Funk-Brücke.
 - Einstellungen Fahrzeug-Kennung, Funkkanal, Sendeleistung, Kanal-Rate (Zentrale), Rückkanal (Teilnehmer): WebUI-Reiter „Funk“ oder Lua-Ordner „Funk“ (Felder 28–35). Gelten nach Neustart. NVS `input fkid fkch fkpwr fkrate fkback`.
 - WebUI-Reiter „Funk“: Ampel, Zähler, Gegenstellen mit Rolle, Adresse, Verlust, RSSI. Übersicht zeigt den Eingang.
