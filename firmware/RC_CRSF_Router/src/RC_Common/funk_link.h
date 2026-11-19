@@ -155,6 +155,8 @@ private:
     Counters   cnt_ = {}, cntSec_ = {}, cntLast_ = {};
     volatile uint32_t noAck_ = 0, qFull_ = 0;
     uint32_t   sendErr_ = 0, crcErr_ = 0, stale_ = 0, rateDrop_ = 0;
+    // 1.5.1: Gesamtzaehler fuer die Fehlersuche (Rueckweg Teilnehmer)
+    uint32_t   wrBytes_ = 0, wrResync_ = 0, backDrop_ = 0, noPeer_ = 0;
     // CRSF-Seite: Empfangsring und Sende-Zusammenbau
     uint8_t    ring_[FUNK_RING];
     uint16_t   rHead_ = 0, rCount_ = 0;

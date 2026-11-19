@@ -75,9 +75,9 @@
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
 #define FW_MINOR 4
-#define FW_PATCH 0
-static const char*   FW_VERSION       = "0.4.0";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 40
+#define FW_PATCH 2
+static const char*   FW_VERSION       = "0.4.2";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 42
 // Versionsgeschichte: siehe CHANGELOG.md im Hauptordner des Repos.
 
 static HardwareSerial* const UPLINK_SERIAL = &Serial0;
