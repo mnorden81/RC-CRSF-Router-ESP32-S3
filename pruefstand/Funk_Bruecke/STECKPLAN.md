@@ -1,6 +1,6 @@
 # Steckplan: Funk-Brücke mit zwei ESP32-S3-Zero auf dem Breadboard
 
-Autor: PiperPilot · Firmware v0.1.7
+Autor: PiperPilot · Firmware v0.1.8
 
 ## Was du brauchst
 
@@ -84,4 +84,4 @@ Das Modul bekommt seinen eigenen Strom. GND muss trotzdem verbunden sein.
 | Zero 1 grün **schnell** | Funk ok, aber vom Empfänger kommt nichts: GPIO5 an **TX** prüfen, GND prüfen, Empfänger-LED muss dauerhaft leuchten |
 | beide **rot** | keine Funk-Verbindung: Kennung und Kanal auf beiden Seiten gleich? |
 | Farben vertauscht | WebUI → „LED-Reihenfolge“ umstellen |
-| LED leuchtet **dauerhaft** | Firmware hängt: RESET drücken, Version prüfen (v0.1.7) |
+| LED leuchtet **dauerhaft** | Firmware hängt: RESET drücken, Version prüfen (v0.1.8) |
