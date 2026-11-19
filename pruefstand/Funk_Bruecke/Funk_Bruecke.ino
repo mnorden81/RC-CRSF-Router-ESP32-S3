@@ -52,6 +52,13 @@
  *          kein serieller Monitor offen ist; veraltete Kanal-Frames werden
  *          bei Rueckstau verworfen; UART-Sendepuffer; Zaehler fuer
  *          Warteschlange voll / verworfen in der WebUI
+ *   0.1.9  Direkte Zustellung (Unicast) an bekannte Gegenstellen: der
+ *          Funkchip wartet auf Quittung und wiederholt verlorene Pakete
+ *          selbst (Rundruf nur noch, solange keine Gegenstelle bekannt ist).
+ *          Name je Bruecke (WebUI, WLAN-Name, Gegenstellen-Tabelle) und
+ *          automatische Anzeige "am Empfaenger" / "am Modul".
+ *          Sendeleistung nach WLAN-Start erneut setzen. Neustart-Erkennung
+ *          der Gegenstelle robuster (verfaelschte Verlustzahl).
  */
 
 #include <WiFi.h>
@@ -65,7 +72,7 @@
 #include <freertos/queue.h>
 #include "bruecke_types.h"
 
-#define FW_VERSION "0.1.8"
+#define FW_VERSION "0.1.9"
 
 // ── Pins je Chip ──────────────────────────────────────────────────────
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -112,6 +119,7 @@ struct Settings {
     uint8_t  rcInterval;   // Kanal-Frames hoechstens alle n ms funken (0 = alle)
     bool     ledRgb;       // LED-Reihenfolge RGB (S3-Zero) statt GRB
     bool     wifiOn;       // WLAN beim Start an
+    char     name[17];     // frei waehlbarer Name, z. B. "Empfaenger"
 };
 static Settings cfg;
 static Preferences prefs;
@@ -125,6 +133,8 @@ static void loadSettings() {
     cfg.rcInterval = prefs.getUChar("rcint", 0);
     cfg.ledRgb     = prefs.getBool("ledrgb2", LED_RGB_DEFAULT);
     cfg.wifiOn     = prefs.getBool("wifi", true);
+    String n       = prefs.getString("name", "");
+    strlcpy(cfg.name, n.c_str(), sizeof(cfg.name));
     prefs.end();
     if (cfg.group == 0) cfg.group = 1;
     if (cfg.channel < 1 || cfg.channel > 13) cfg.channel = 1;
@@ -140,6 +150,7 @@ static void saveSettings() {
     prefs.putUChar("rcint", cfg.rcInterval);
     prefs.putBool ("ledrgb2", cfg.ledRgb);
     prefs.putBool ("wifi",  cfg.wifiOn);
+    prefs.putString("name", cfg.name);
     prefs.end();
 }
 
@@ -154,7 +165,7 @@ struct __attribute__((packed)) PktHdr {
     uint8_t  type;             // PKT_*
     uint16_t seq;              // fortlaufend je Sender (nur DATA)
 };
-struct __attribute__((packed)) PingBody { uint32_t tUs; };
+struct __attribute__((packed)) PingBody { uint32_t tUs; char name[16]; };   // name ab v0.1.9 (aeltere senden nur tUs)
 struct __attribute__((packed)) PongBody { uint8_t to[6]; uint32_t tUs; };
 
 static const uint8_t BCAST[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -166,7 +177,7 @@ static Peer peers[MAX_PEERS];
 static uint8_t myMac[6];
 
 struct Counters {
-    uint32_t uartIn, uartOut, crcErr, rcUart, rcRadio, sendErr, txPkts, queueFull, rcStale;
+    uint32_t uartIn, uartOut, crcErr, rcUart, rcRadio, sendErr, txPkts, queueFull, rcStale, noAck;
 };
 static Counters cnt, cntSec, cntLast;   // gesamt, Stand der letzten Sekunde, Rate
 static uint32_t lastRcRadioMs = 0, lastRcUartMs = 0, lastRcSentMs = 0;
@@ -181,6 +192,14 @@ static Peer* findPeer(const uint8_t* mac, bool create) {
         return &p;
     }
     return nullptr;
+}
+
+// Rolle automatisch: wer Kanaele vom Kabel bekommt, haengt am Empfaenger
+static const char* roleText() {
+    uint32_t now = millis();
+    if (lastRcUartMs  && now - lastRcUartMs  <= 1000) return "am Empf&auml;nger";
+    if (lastRcRadioMs && now - lastRcRadioMs <= 1000) return "am Modul";
+    return "ohne Kan&auml;le";
 }
 
 static String macStr(const uint8_t* m) {
@@ -217,13 +236,43 @@ static void sendRaw(const uint8_t* data, size_t len) {
     if (e == ESP_OK) cnt.txPkts++; else cnt.sendErr++;
 }
 
+// Gegenstelle als ESP-NOW-Peer eintragen (fuer Unicast mit Quittung)
+static void peerRegister(Peer* p) {
+    if (!p || p->espAdded) return;
+    esp_now_peer_info_t pi = {};
+    memcpy(pi.peer_addr, p->mac, 6);
+    pi.channel = cfg.channel;
+    pi.ifidx   = WIFI_IF_STA;
+    pi.encrypt = false;
+    esp_err_t e = esp_now_add_peer(&pi);
+    p->espAdded = (e == ESP_OK || e == ESP_ERR_ESPNOW_EXIST);
+}
+
+static bool peerReachable(const Peer& p, uint32_t now) {
+    return p.used && p.espAdded && p.lastAnyMs && now - p.lastAnyMs <= 1000;
+}
+
+static void sendTo(const uint8_t* mac, const uint8_t* data, size_t len) {
+    esp_err_t e = esp_now_send(mac, data, len);
+    if (e == ESP_OK) cnt.txPkts++; else cnt.sendErr++;
+}
+
+// Nutzdaten: direkt an jede bekannte Gegenstelle (Funkchip wiederholt
+// selbst, bis die Quittung kommt). Ist noch keine bekannt: Rundruf.
+static void sendData(const uint8_t* data, size_t len) {
+    uint32_t now = millis();
+    bool any = false;
+    for (auto& p : peers) if (peerReachable(p, now)) { sendTo(p.mac, data, len); any = true; }
+    if (!any) sendRaw(data, len);
+}
+
 static void radioSendFrame(const uint8_t* f, uint8_t flen) {
     uint8_t pkt[sizeof(PktHdr) + 64];
     PktHdr* h = (PktHdr*)pkt;
     h->magic0 = 'P'; h->magic1 = 'F'; h->version = 1;
     h->group = cfg.group; h->type = PKT_DATA; h->seq = txSeq++;
     memcpy(pkt + sizeof(PktHdr), f, flen);
-    sendRaw(pkt, sizeof(PktHdr) + flen);
+    sendData(pkt, sizeof(PktHdr) + flen);
 }
 
 static void onUartFrame(const uint8_t* f, uint8_t flen) {
@@ -292,6 +341,7 @@ static void handleRadio(const RxItem& it) {
     Peer* p = findPeer(it.mac, true);
     if (!p) return;
     p->lastAnyMs = now;
+    peerRegister(p);
 
     switch (h->type) {
     case PKT_DATA: {
@@ -301,7 +351,7 @@ static void handleRadio(const RxItem& it) {
             // Nummer springt zurueck = Gegenstelle wurde neu gestartet:
             // neu synchronisieren statt alles als "alt" zu verwerfen
             // (v0.1.1 hat dann bis zu Minuten lang nichts weitergegeben).
-            if (d > 30000) d = 1;
+            if (d > 1000) d = 1;
             if (d > 1) p->lost += d - 1;
             uint32_t gap = now - p->lastMs;
             if (gap > LINK_TIMEOUT_MS) p->dropouts++;
@@ -323,7 +373,11 @@ static void handleRadio(const RxItem& it) {
         break;
     }
     case PKT_PING: {
-        if (blen < (int)sizeof(PingBody)) break;
+        if (blen < 4) break;
+        if (blen >= (int)sizeof(PingBody)) {
+            memcpy(p->name, ((const PingBody*)body)->name, 16);
+            p->name[16] = 0;
+        }
         uint8_t pkt[sizeof(PktHdr) + sizeof(PongBody)];
         PktHdr* o = (PktHdr*)pkt;
         o->magic0 = 'P'; o->magic1 = 'F'; o->version = 1;
@@ -331,7 +385,7 @@ static void handleRadio(const RxItem& it) {
         PongBody* pb = (PongBody*)(pkt + sizeof(PktHdr));
         memcpy(pb->to, it.mac, 6);
         pb->tUs = ((const PingBody*)body)->tUs;
-        sendRaw(pkt, sizeof(pkt));
+        sendTo(it.mac, pkt, sizeof(pkt));
         break;
     }
     case PKT_PONG: {
@@ -352,8 +406,22 @@ static void sendPing() {
     PktHdr* h = (PktHdr*)pkt;
     h->magic0 = 'P'; h->magic1 = 'F'; h->version = 1;
     h->group = cfg.group; h->type = PKT_PING; h->seq = 0;
-    ((PingBody*)(pkt + sizeof(PktHdr)))->tUs = micros();
-    sendRaw(pkt, sizeof(pkt));
+    PingBody* pb = (PingBody*)(pkt + sizeof(PktHdr));
+    pb->tUs = micros();
+    memset(pb->name, 0, sizeof(pb->name));
+    strncpy(pb->name, cfg.name, sizeof(pb->name));
+    sendRaw(pkt, sizeof(pkt));          // Ping bleibt Rundruf: so finden sich neue Bruecken
+}
+
+// Quittung je Unicast-Paket (Rundruf hat keine): fehlt sie auch nach den
+// Wiederholungen des Funkchips, zaehlen wir "nicht zugestellt"
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+static void onSent(const esp_now_send_info_t* info, esp_now_send_status_t st) {
+    const uint8_t* mac = info ? info->des_addr : nullptr;
+#else
+static void onSent(const uint8_t* mac, esp_now_send_status_t st) {
+#endif
+    if (st != ESP_NOW_SEND_SUCCESS && mac && memcmp(mac, BCAST, 6) != 0) cnt.noAck++;
 }
 
 // ── Funk starten ──────────────────────────────────────────────────────
@@ -371,6 +439,7 @@ static void radioBegin() {
         esp_read_mac(myMac, ESP_MAC_WIFI_STA);
     if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW Start fehlgeschlagen"); return; }
     esp_now_register_recv_cb(onRecv);
+    esp_now_register_send_cb(onSent);
     esp_now_peer_info_t pi = {};
     memcpy(pi.peer_addr, BCAST, 6);
     pi.channel = cfg.channel;
@@ -391,14 +460,16 @@ h1{font-size:20px;margin:0 0 4px}small{color:#666}
 table{border-collapse:collapse;width:100%}td,th{padding:4px 6px;text-align:left;border-bottom:1px solid #eee;font-size:14px}
 th{color:#555;font-weight:600}.ok{color:#18833a;font-weight:600}.bad{color:#c62828;font-weight:600}
 label{display:block;margin:8px 0 2px;font-size:14px}input,select{font-size:16px;padding:6px;width:100%;box-sizing:border-box}
+.role{font-size:14px;background:#e3f2fd;color:#0d47a1;border-radius:6px;padding:2px 8px;vertical-align:middle}
 button{margin-top:12px;font-size:16px;padding:8px 14px;border:0;border-radius:6px;background:#1565c0;color:#fff}
 </style></head><body>
-<h1>Funk-Br&uuml;cke <span id="ver"></span></h1><small id="me"></small>
+<h1><span id="nm">Funk-Br&uuml;cke</span> <span id="role" class="role"></span> <small id="ver"></small></h1><small id="me"></small>
 <div class="card"><b>Status:</b> <span id="st">...</span>
 <table id="own"></table></div>
 <div class="card"><b>Gegenstellen</b><table id="peers"></table></div>
 <div class="card"><b>Einstellungen</b> <small>(beide Br&uuml;cken gleich einstellen; Speichern startet neu)</small>
 <form id="f">
+<label>Name dieser Br&uuml;cke (z. B. Empfaenger, Multiswitch; max. 16 Zeichen, nur Buchstaben/Ziffern)<input name="name" maxlength="16"></label>
 <label>Fahrzeug-Kennung (1-255)<input name="group" type="number" min="1" max="255"></label>
 <label>Funkkanal (1-13)<input name="chan" type="number" min="1" max="13"></label>
 <label>Sendeleistung<select name="txp"><option value="2">2 dBm</option><option value="5">5 dBm</option><option value="8">8 dBm</option><option value="11">11 dBm</option><option value="15">15 dBm</option><option value="20">20 dBm</option></select></label>
@@ -411,13 +482,13 @@ button{margin-top:12px;font-size:16px;padding:8px 14px;border:0;border-radius:6p
 const $=id=>document.getElementById(id);
 function row(a,b){return '<tr><th>'+a+'</th><td>'+b+'</td></tr>'}
 async function load(){try{const s=await (await fetch('/api/stats')).json();
-$('ver').textContent='v'+s.ver;$('me').textContent=s.board+' · '+s.mac+' · Kennung '+s.group+' · Kanal '+s.chan+' · '+s.txp+' dBm';
+$('ver').textContent='v'+s.ver;$('nm').textContent=s.name||'Funk-Brücke';$('role').innerHTML=s.role;document.title=(s.name||'Funk-Brücke')+' ('+s.mac.slice(-5)+')';$('me').textContent=s.board+' · '+s.mac+' · Kennung '+s.group+' · Kanal '+s.chan+' · '+s.txp+' dBm';
 $('st').innerHTML=s.link?'<span class="ok">Funk-Verbindung da</span>':'<span class="bad">keine Funk-Verbindung</span>';
 $('own').innerHTML=row('Kanal-Frames vom Kabel /s',s.rcUart)+row('Kanal-Frames aus Funk /s',s.rcRadio)+
 row('Frames Kabel → Funk /s',s.uartIn)+row('Frames Funk → Kabel /s',s.uartOut)+row('Gesendete Pakete /s',s.tx)+
-row('CRC-Fehler gesamt',s.crcErr)+row('Sendefehler gesamt',s.sendErr)+row('Warteschlange voll gesamt',s.qFull)+row('Veraltete Kanal-Frames verworfen',s.stale)+row('Laufzeit',s.up+' s');
+row('CRC-Fehler gesamt',s.crcErr)+row('Sendefehler gesamt',s.sendErr)+row('Nicht zugestellt (keine Quittung) gesamt',s.noAck)+row('Warteschlange voll gesamt',s.qFull)+row('Veraltete Kanal-Frames verworfen',s.stale)+row('Laufzeit',s.up+' s');
 let h='<tr><th>Gegenstelle</th><th>Pakete/s</th><th>verloren</th><th>Aussetzer &gt;200ms</th><th>l&auml;ngste L&uuml;cke</th><th>Laufzeit (eine Richtung)</th><th>RSSI</th></tr>';
-for(const p of s.peers){h+='<tr><td>'+p.mac.slice(-5)+(p.alive?'':' <span class="bad">weg</span>')+'</td><td>'+p.rx+'</td><td>'+p.lost+' ('+p.lossPct+' %)</td><td>'+p.drop+
+for(const p of s.peers){h+='<tr><td>'+(p.name?'<b>'+p.name+'</b> ':'')+p.mac.slice(-5)+(p.alive?'':' <span class="bad">weg</span>')+'</td><td>'+p.rx+'</td><td>'+p.lost+' ('+p.lossPct+' %)</td><td>'+p.drop+
 '</td><td>'+p.gapSec+' / '+p.maxGap+' ms</td><td>'+(p.rtt/2000).toFixed(2)+' ms (max '+(p.rttMax/2000).toFixed(2)+')</td><td>'+p.rssi+' dBm</td></tr>'}
 $('peers').innerHTML=s.peers.length?h:'<tr><td>noch keine Gegenstelle empfangen</td></tr>';}catch(e){}}
 async function loadCfg(){const c=await (await fetch('/api/config')).json();const f=$('f');for(const k in c)if(f[k])f[k].value=c[k];}
@@ -431,6 +502,7 @@ static void handleStats() {
     uint32_t now = millis();
     String j = "{";
     j += "\"ver\":\"" FW_VERSION "\",\"board\":\"" BOARD_NAME "\",\"mac\":\"" + macStr(myMac) + "\"";
+    j += ",\"name\":\"" + String(cfg.name) + "\",\"role\":\"" + String(roleText()) + "\"";
     j += ",\"group\":" + String(cfg.group) + ",\"chan\":" + String(cfg.channel) + ",\"txp\":" + String(cfg.txPower);
     bool link = false;
     for (auto& p : peers) if (p.used && p.lastAnyMs && now - p.lastAnyMs <= LINK_TIMEOUT_MS) link = true;
@@ -438,7 +510,7 @@ static void handleStats() {
     j += ",\"rcUart\":" + String(cntLast.rcUart) + ",\"rcRadio\":" + String(cntLast.rcRadio);
     j += ",\"uartIn\":" + String(cntLast.uartIn) + ",\"uartOut\":" + String(cntLast.uartOut);
     j += ",\"tx\":" + String(cntLast.txPkts) + ",\"crcErr\":" + String(cnt.crcErr) + ",\"sendErr\":" + String(cnt.sendErr);
-    j += ",\"qFull\":" + String(cnt.queueFull) + ",\"stale\":" + String(cnt.rcStale);
+    j += ",\"qFull\":" + String(cnt.queueFull) + ",\"stale\":" + String(cnt.rcStale) + ",\"noAck\":" + String(cnt.noAck);
     j += ",\"up\":" + String(upSec) + ",\"peers\":[";
     bool first = true;
     for (auto& p : peers) {
@@ -447,7 +519,7 @@ static void handleStats() {
         first = false;
         uint32_t tot = p.rx + p.lost;
         float pct = tot ? 100.0f * p.lost / tot : 0;
-        j += "{\"mac\":\"" + macStr(p.mac) + "\",\"alive\":" + String(p.lastAnyMs && now - p.lastAnyMs <= LINK_TIMEOUT_MS ? "true" : "false");
+        j += "{\"name\":\"" + String(p.name) + "\",\"mac\":\"" + macStr(p.mac) + "\",\"alive\":" + String(p.lastAnyMs && now - p.lastAnyMs <= LINK_TIMEOUT_MS ? "true" : "false");
         j += ",\"rx\":" + String(p.rxSecLast) + ",\"lost\":" + String(p.lost) + ",\"lossPct\":" + String(pct, 2);
         j += ",\"drop\":" + String(p.dropouts) + ",\"gapSec\":" + String(p.gapSecLast) + ",\"maxGap\":" + String(p.maxGapMs);
         j += ",\"rtt\":" + String(p.rttAvgUs) + ",\"rttMax\":" + String(p.rttMaxUs) + ",\"rssi\":" + String(p.rssi) + "}";
@@ -459,7 +531,7 @@ static void handleStats() {
 static void handleConfigGet() {
     String j = "{\"group\":" + String(cfg.group) + ",\"chan\":" + String(cfg.channel) + ",\"txp\":" + String(cfg.txPower) +
                ",\"baud\":" + String(cfg.baud) + ",\"rcint\":" + String(cfg.rcInterval) +
-               ",\"ledrgb\":" + String(cfg.ledRgb ? 1 : 0) + ",\"wifi\":" + String(cfg.wifiOn ? 1 : 0) + "}";
+               ",\"ledrgb\":" + String(cfg.ledRgb ? 1 : 0) + ",\"wifi\":" + String(cfg.wifiOn ? 1 : 0) + ",\"name\":\"" + String(cfg.name) + "\"}";
     web.send(200, "application/json", j);
 }
 
@@ -471,6 +543,16 @@ static void handleConfigPost() {
     if (web.hasArg("rcint")) cfg.rcInterval = constrain(web.arg("rcint").toInt(), 0, 50);
     if (web.hasArg("ledrgb")) cfg.ledRgb    = web.arg("ledrgb").toInt() != 0;
     if (web.hasArg("wifi"))  cfg.wifiOn     = web.arg("wifi").toInt() != 0;
+    if (web.hasArg("name")) {
+        // nur einfache Zeichen (JSON, WLAN-Name): Buchstaben, Ziffern, Leer, - _
+        String in = web.arg("name"), out;
+        for (size_t i = 0; i < in.length() && out.length() < 16; i++) {
+            char c = in[i];
+            if (isalnum((unsigned char)c) || c == ' ' || c == '-' || c == '_') out += c;
+        }
+        out.trim();
+        strlcpy(cfg.name, out.c_str(), sizeof(cfg.name));
+    }
     saveSettings();
     web.send(200, "text/plain", "ok");
     delay(300);
@@ -484,12 +566,16 @@ static void wifiApSet(bool on) {
         WiFi.mode(WIFI_AP_STA);            // AP dazu, STA bleibt fuer ESP-NOW
         WiFi.softAP(apName, "123456789", cfg.channel);
         WiFi.softAPConfig(ip, ip, mask);
+        // AP-Start kann Kanal/Sendeleistung zuruecksetzen -> erneut setzen
+        esp_wifi_set_channel(cfg.channel, WIFI_SECOND_CHAN_NONE);
+        esp_wifi_set_max_tx_power(cfg.txPower * 4);
         web.begin();
         Serial.printf("WLAN an: \"%s\" (Passwort 123456789), http://192.168.1.1\n", apName);
     } else {
         web.stop();
         WiFi.softAPdisconnect(true);       // zurueck auf reinen STA-Betrieb
         esp_wifi_set_channel(cfg.channel, WIFI_SECOND_CHAN_NONE);
+        esp_wifi_set_max_tx_power(cfg.txPower * 4);
         Serial.println("WLAN aus");
     }
     wifiApOn = on;
@@ -587,7 +673,8 @@ void setup() {
     gpio_pullup_en((gpio_num_t)PIN_CRSF_RX);
 
     radioBegin();
-    snprintf(apName, sizeof(apName), "Funk-Bruecke-%02X%02X", myMac[4], myMac[5]);
+    if (cfg.name[0]) snprintf(apName, sizeof(apName), "Funk-%s", cfg.name);
+    else             snprintf(apName, sizeof(apName), "Funk-Bruecke-%02X%02X", myMac[4], myMac[5]);
     web.on("/", [] { web.send_P(200, "text/html", PAGE); });
     web.on("/api/stats", handleStats);
     web.on("/api/config", HTTP_GET, handleConfigGet);

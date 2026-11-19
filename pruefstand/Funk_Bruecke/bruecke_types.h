@@ -24,4 +24,6 @@ struct Peer {
     uint32_t rttSumUs, rttCnt; // Mittelwert je Sekunde
     uint32_t rttAvgUs;
     int8_t   rssi;
+    bool     espAdded;         // als ESP-NOW-Peer eingetragen (Unicast)
+    char     name[17];         // Name der Gegenstelle (aus ihrem Ping)
 };
