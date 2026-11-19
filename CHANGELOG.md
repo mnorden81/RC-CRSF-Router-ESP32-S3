@@ -2,6 +2,9 @@
 
 Die Version wird bei jeder Änderung erhöht, auch die CRSF „Parameter Version Number“ im DEVICE_INFO. Neueste Version oben.
 
+## v0.4.1 (RC_Common 1.5.1)
+- RC_Common 1.5.1: `/api/funk` liefert zusätzlich Gesamtzähler (`total`) für die Fehlersuche am Funk-Rückweg. Sonst keine Änderung.
+
 ## v0.4.0 (RC_Common 1.5.0)
 - Der Prüfstand Funk-Brücke ist jetzt ein eigenes Projekt: Repo ESP32_ESP-NOW_CRSF-Link (`pruefstand/` und dessen CI hier entfernt).
 - Neu: **Funk** (ESP-NOW, aus der Funk-Brücke v0.1.9). Einstellung „Eingang“: Kabel (wie bisher), „Kabel + Funk (Zentrale)“ = CRSF vom Empfänger geht zusätzlich per Funk an Teilnehmer (Router-Port D), „Funk (Teilnehmer)“ = CRSF kommt nur aus dem Funk, Port A bleibt frei, Port B/C verteilen weiter. Passt zum Multiswitch ab v5.01 und zur Funk-Brücke.

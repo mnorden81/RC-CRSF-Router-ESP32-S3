@@ -259,7 +259,7 @@ int8_t FunkLink::worstRssi() const {
 void FunkLink::sendFrame(const uint8_t* f, uint8_t n) {
     if (!active() || n < 4 || n > 64) return;
     uint32_t now = millis();
-    if (role_ == FUNK_TEILNEHMER && !cfg_.back) return;   // nur empfangen
+    if (role_ == FUNK_TEILNEHMER && !cfg_.back) { backDrop_++; return; }   // nur empfangen
     if (f[2] == 0x16) {                                     // RC-Kanaele
         if (role_ == FUNK_ZENTRALE && cfg_.rateMs && now - lastRcSentMs_ < cfg_.rateMs) { rateDrop_++; return; }
         lastRcSentMs_ = now;
@@ -271,11 +271,14 @@ void FunkLink::sendFrame(const uint8_t* f, uint8_t n) {
     h->group = cfg_.id; h->type = PKT_DATA; h->seq = txSeq_++;
     memcpy(pkt + sizeof(PktHdr), f, n);
     cnt_.framesOut++;
+    bool any = false;
     for (auto& p : peers_) {
         if (!reachable(p, now)) continue;
+        any = true;
         if (esp_now_send(p.mac, pkt, sizeof(PktHdr) + n) == ESP_OK) cnt_.sent++;
         else sendErr_++;
     }
+    if (!any) noPeer_++;
 }
 
 void FunkLink::sendPing() {
@@ -297,9 +300,10 @@ void FunkLink::sendPing() {
 size_t FunkLink::write(uint8_t b) { return write(&b, 1); }
 
 size_t FunkLink::write(const uint8_t* buf, size_t len) {
+    wrBytes_ += len;
     for (size_t i = 0; i < len; i++) {
         uint8_t b = buf[i];
-        if (txPos_ == 1 && (b < 2 || b > 62)) { txPos_ = 0; continue; }
+        if (txPos_ == 1 && (b < 2 || b > 62)) { txPos_ = 0; wrResync_++; continue; }
         tx_[txPos_++] = b;
         if (txPos_ >= 2 && txPos_ >= tx_[1] + 2) {
             sendFrame(tx_, txPos_);
@@ -431,6 +435,7 @@ void FunkLink::resetStats() {
     }
     noAck_ = qFull_ = 0;
     sendErr_ = crcErr_ = stale_ = rateDrop_ = 0;
+    wrBytes_ = wrResync_ = backDrop_ = noPeer_ = 0;
     cnt_.sent = cntSec_.sent = 0;
 }
 
@@ -494,6 +499,10 @@ String FunkLink::statusJson() const {
     j += ",\"sent\":" + String(cntLast_.sent) + ",\"noack\":" + String(noAck_);
     j += ",\"qfull\":" + String(qFull_) + ",\"senderr\":" + String(sendErr_);
     j += ",\"crc\":" + String(crcErr_) + ",\"stale\":" + String(stale_) + ",\"rate_drop\":" + String(rateDrop_) + "}";
+    // 1.5.1: Gesamtzaehler seit Start bzw. Zuruecksetzen
+    j += ",\"total\":{\"frames_out\":" + String(cnt_.framesOut) + ",\"frames_in\":" + String(cnt_.framesIn);
+    j += ",\"sent\":" + String(cnt_.sent) + ",\"wr_bytes\":" + String(wrBytes_) + ",\"wr_resync\":" + String(wrResync_);
+    j += ",\"back_drop\":" + String(backDrop_) + ",\"no_peer\":" + String(noPeer_) + "}";
     j += ",\"peers\":[";
     bool first = true;
     for (auto& p : peers_) {
