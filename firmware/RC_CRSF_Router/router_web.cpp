@@ -6,6 +6,9 @@
 #include "webui.h"
 #include "src/RC_Common/web_common.h"
 #include "src/RC_Common/config_backup.h"
+#include "src/RC_Common/funk_link.h"
+
+extern FunkLink funk;   // RC_CRSF_Router.ino (v0.4.0)
 
 static WebServer server(80);
 static bool      apActive = false;
@@ -35,6 +38,10 @@ static String configJson() {
     j += ",\"tempSend\":" + String(cfg.tempSend ? "true" : "false");
     j += ",\"sportId0\":" + String(cfg.sportPollId[0]);
     j += ",\"sportId1\":" + String(cfg.sportPollId[1]);
+    j += ",\"input\":" + String(cfg.input);
+    j += ",\"funk_id\":" + String(cfg.funk.id) + ",\"funk_ch\":" + String(cfg.funk.ch);
+    j += ",\"funk_pwr\":" + String(cfg.funk.pwr) + ",\"funk_rate\":" + String(cfg.funk.rateMs);
+    j += ",\"funk_back\":" + String(cfg.funk.back ? "true" : "false");
     j += "}";
     return j;
 }
@@ -68,6 +75,12 @@ static void handleConfigPost() {
     if (webJsonBool(b, "tempSend", f))   cfg.tempSend = f;
     if (webJsonInt(b, "sportId0", i))    cfg.sportPollId[0] = (uint8_t)i;
     if (webJsonInt(b, "sportId1", i))    cfg.sportPollId[1] = (uint8_t)i;
+    if (webJsonInt(b, "input", i))       cfg.input = (uint8_t)i;
+    if (webJsonInt(b, "funk_id", i))     cfg.funk.id = (uint8_t)constrain(i, 1, 255);
+    if (webJsonInt(b, "funk_ch", i))     cfg.funk.ch = (uint8_t)constrain(i, 1, 13);
+    if (webJsonInt(b, "funk_pwr", i))    cfg.funk.pwr = (uint8_t)constrain(i, 2, 20);
+    if (webJsonInt(b, "funk_rate", i))   cfg.funk.rateMs = (uint8_t)constrain(i, 0, 50);
+    if (webJsonBool(b, "funk_back", f))  cfg.funk.back = f;
     cfgSave();
     sendJson("{\"ok\":true}");
 }
@@ -80,12 +93,15 @@ void webBegin() {
     server.on("/api/restart", HTTP_POST, []() { sendJson("{\"ok\":true}"); routerRequestRestart(); });
     webCommonRegister(server, cfgSave);
     cfgBackupRegister(server);
+    funk.registerWeb(server);   // v0.4.0: /api/funk, /api/funk/reset
     server.onNotFound([]() { server.send(404, "text/plain", "Nicht gefunden"); });
 }
 
 void webEnableAP() {
     if (apActive) return;
-    WiFi.softAP(cfg.common.ssid, cfg.common.pass);
+    // v0.4.0: mit Funk auf dessen Kanal (ein Funkteil fuer beides)
+    WiFi.softAP(cfg.common.ssid, cfg.common.pass, funk.active() ? funk.channel() : 1);
+    funk.wifiChanged();
     IPAddress ip, mask(255, 255, 255, 0);
     if (!ip.fromString(cfg.common.ip)) ip.fromString("192.168.1.1");
     WiFi.softAPConfig(ip, ip, mask);
@@ -97,7 +113,8 @@ void webEnableAP() {
 void webDisableAP() {
     if (!apActive) return;
     server.stop();
-    WiFi.softAPdisconnect(true);
+    WiFi.softAPdisconnect(true);   // mit Funk bleibt die STA-Seite (ESP-NOW) an
+    funk.wifiChanged();
     apActive = false;
     Serial.println("WLAN aus");
 }

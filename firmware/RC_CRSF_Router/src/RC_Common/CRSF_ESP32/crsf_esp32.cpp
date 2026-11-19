@@ -483,6 +483,8 @@ void CRSF::read_packets(uint8_t debug) {
 //    A -> B und C : alles ausser Extended-Frames an die eigene Adresse
 //    B/C -> A     : alles
 //    B <-> C      : nie
+//  Seit 1.2.0 gibt es Port D fuer die Funk-Verbindung, er verhaelt sich
+//  wie B und C.
 //  Frames ohne Extended-Header (Typ < 0x28, z.B. RC-Kanaele 0x16 und
 //  Link-Statistik 0x14) haben keine Zieladresse und gehen immer weiter.
 // ════════════════════════════════════════════════════════════════════
@@ -507,7 +509,12 @@ void CRSF::init_router(HardwareSerial* portB, uint8_t bRx, uint8_t bTx,
 void CRSF::attach_router_streams(Stream* portB, Stream* portC) {
     portB_.ser = portB;
     portC_.ser = portC;
-    routerActive = (portB_.ser || portC_.ser);
+    routerActive = (portB_.ser || portC_.ser || portD_.ser);
+}
+
+void CRSF::attach_funk_stream(Stream* portD) {
+    portD_.ser = portD;
+    routerActive = (portB_.ser || portC_.ser || portD_.ser);
 }
 
 bool CRSF::isSyncByte(uint8_t b) {
@@ -545,6 +552,7 @@ void CRSF::routeFromA(const uint8_t* f, uint8_t n) {
         deviceAddress != CRSF_SYNC_byte) return;
     if (portB_.ser) enqueue(portB_, f, n);
     if (portC_.ser) enqueue(portC_, f, n);
+    if (portD_.ser) enqueue(portD_, f, n);
     fwdDown++;
 }
 
@@ -555,7 +563,7 @@ void CRSF::routeFromDown(CrsfPort& p) {
         // Doppelte Adresse: ein Modul weiter hinten meldet unsere Adresse
         if (p.rx[2] == CRSF_FRAMETYPE_DEVICE_INFO && n > 5 && p.rx[4] == deviceAddress) {
             duplicateAddress = true;
-            duplicatePorts |= (&p == &portC_) ? 2 : 1;
+            duplicatePorts |= (&p == &portD_) ? 4 : (&p == &portC_) ? 2 : 1;
         }
         if (portA_.ser) enqueue(portA_, p.rx, n);
         fwdUp++;
@@ -609,9 +617,11 @@ void CRSF::route_packets() {
     if (!routerActive || !portA_.ser) return;
     if (portB_.ser) routeFromDown(portB_);
     if (portC_.ser) routeFromDown(portC_);
+    if (portD_.ser) routeFromDown(portD_);
     serviceQueue(portA_);
     if (portB_.ser) serviceQueue(portB_);
     if (portC_.ser) serviceQueue(portC_);
+    if (portD_.ser) serviceQueue(portD_);
 }
 
 void CRSF::send_rc_channels_packed() {

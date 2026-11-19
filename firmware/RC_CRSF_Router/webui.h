@@ -27,9 +27,13 @@ button.s{font:inherit;border:1px solid var(--line);background:var(--p);color:var
 .bad{color:var(--bad)}.warn{color:var(--warn)}.ok{color:var(--ok)}.mut{color:var(--mut);font-size:12px}
 .mono{font-family:ui-monospace,monospace}
 [hidden]{display:none!important}
+.amp{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--mut);vertical-align:middle;margin-right:6px}
+.amp.g{background:var(--ok)}.amp.y{background:var(--warn)}.amp.r{background:var(--bad)}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:500}
+.tw{overflow-x:auto}
 </style></head><body>
 <header><b>CRSF-Router</b><span id="hdr" class="mono"></span></header>
-<nav id="nav"><button data-t="over" class="on">Übersicht</button><button data-t="ports">Ports</button><button data-t="tele">Telemetrie</button><button data-t="sys">WLAN &amp; System</button></nav>
+<nav id="nav"><button data-t="over" class="on">Übersicht</button><button data-t="ports">Ports</button><button data-t="tele">Telemetrie</button><button data-t="funk">Funk</button><button data-t="sys">WLAN &amp; System</button></nav>
 <main>
 <section id="t-over">
  <div class="card"><h2>Status</h2><div class="kv" id="st"></div></div>
@@ -55,6 +59,24 @@ button.s{font:inherit;border:1px solid var(--line);background:var(--p);color:var
   <div class="row"><button class="b" id="saveTele">Speichern</button><span id="tmsg" class="mut"></span></div>
  </div>
  <div class="card"><h2>Sensoren</h2><div class="kv" id="sens"></div></div>
+</section>
+<section id="t-funk" hidden>
+ <div class="card"><h2>Funk (ESP-NOW)</h2>
+  <label>Eingang <select id="fin"><option value="0">Kabel (Port A)</option><option value="1">Kabel + Funk senden (Zentrale)</option><option value="2">Funk (Teilnehmer)</option></select></label>
+  <div id="fset">
+  <label>Fahrzeug-Kennung <input id="fid" type="number" min="1" max="255" style="width:80px"></label>
+  <label>Funkkanal <select id="fch"></select></label>
+  <label>Sendeleistung <select id="fpwr"><option value="2">2 dBm</option><option value="5">5 dBm</option><option value="8">8 dBm</option><option value="11">11 dBm</option><option value="15">15 dBm</option><option value="20">20 dBm</option></select></label>
+  <label id="frow-rate">Kanäle alle <select id="frate"><option value="0">jedes Frame</option><option value="5">5 ms</option><option value="10">10 ms</option><option value="20">20 ms</option><option value="50">50 ms</option></select></label>
+  <label id="frow-back">Rückkanal <select id="fback"><option value="1">An (Lua, Telemetrie)</option><option value="0">Aus (nur empfangen)</option></select></label>
+  </div>
+  <p class="mut" id="fhelp"></p>
+  <div class="row"><button class="b" id="saveFunk">Speichern</button><button class="s" id="rst2">Neustart</button><span id="fmsg" class="mut"></span></div>
+ </div>
+ <div class="card" id="fstat-card"><h2><span class="amp" id="famp"></span><span id="fhead">Verbindung</span></h2><div class="kv" id="fown"></div><p id="fwarn" class="warn"></p></div>
+ <div class="card" id="fpeer-card"><h2 id="fpt">Gegenstellen</h2><div class="tw" id="fpeers"></div>
+  <div class="row"><button class="s" id="freset">Zähler zurücksetzen</button></div>
+  <p class="mut">Ampel: grün = Verlust unter 1 % und RSSI über −75 dBm, gelb = bis 5 % oder bis −85 dBm, rot = schlechter.</p></div>
 </section>
 <section id="t-sys" hidden>
  <div class="card"><h2>WLAN</h2>
@@ -83,16 +105,48 @@ function post(u,d){return fetch(u,{method:'POST',headers:{'Content-Type':'applic
 function msg(id,r,t){$(id).textContent=r&&r.ok?t:'Fehler: '+rcErrText(r?r.error:'');}
 document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(){
   document.querySelectorAll('#nav button').forEach(function(x){x.classList.toggle('on',x===b);});
-  ['over','ports','tele','sys'].forEach(function(t){$('t-'+t).hidden=t!==b.dataset.t;});};});
+  ['over','ports','tele','funk','sys'].forEach(function(t){$('t-'+t).hidden=t!==b.dataset.t;});
+  if(b.dataset.t==='funk')funkPoll();};});
 function kv(el,rows){$(el).innerHTML=rows.map(function(r){return '<span>'+r[0]+'</span><span>'+r[1]+'</span>';}).join('');}
 function hex(a){return '0x'+(0xC0+(+a)).toString(16).toUpperCase();}
+(function(){var o='';for(var c=1;c<=13;c++)o+='<option value="'+c+'">Kanal '+c+([1,6,11].indexOf(c)>=0?' (empfohlen)':'')+'</option>';$('fch').innerHTML=o;})();
+function funkRows(){var i=+$('fin').value;$('fset').hidden=i===0;$('frow-rate').hidden=i!==1;$('frow-back').hidden=i!==2;
+  $('fhelp').textContent=i===1?'Zentrale: CRSF vom Empfänger an Port A geht zusätzlich in den Funk. Pro Fahrzeug genau eine Zentrale.'
+   :i===2?'Teilnehmer: CRSF kommt nur aus dem Funk, Port A bleibt frei. Kennung und Kanal wie bei der Zentrale.':'Kein Funk. Gilt nach einem Neustart.';}
+$('fin').onchange=funkRows;
+$('saveFunk').onclick=function(){var id=Math.max(1,Math.min(255,parseInt($('fid').value)||1));$('fid').value=id;
+  post('/api/config',{input:+$('fin').value,funk_id:id,funk_ch:+$('fch').value,funk_pwr:+$('fpwr').value,funk_rate:+$('frate').value,funk_back:$('fback').value==='1'})
+  .then(function(r){msg('fmsg',r,'Gespeichert. Gilt nach dem Neustart.');});};
+$('rst2').onclick=function(){post('/api/restart').then(function(){$('fmsg').textContent='Router startet neu …';});};
+$('freset').onclick=function(){post('/api/funk/reset').then(funkPoll);};
+function amp(loss,rssi,ok){return !ok?'r':(loss<1&&rssi>-75)?'g':(loss<=5&&rssi>=-85)?'y':'r';}
+function pct(v){return v.toFixed(1).replace('.',',')+' %';}
+function funkPoll(){if($('t-funk').hidden)return;fetch('/api/funk').then(function(r){return r.json();}).then(function(f){
+  var on=!!f.role;$('fstat-card').hidden=!on;$('fpeer-card').hidden=!on;if(!on)return;
+  $('famp').className='amp '+amp(f.loss,f.rssi,f.connected);
+  $('fhead').textContent=f.role+': '+(f.connected?'verbunden':'keine Funk-Verbindung');
+  var o=f.own,Z=f.role==='Zentrale';
+  kv('fown',[['Kennung / Kanal / Leistung',f.id+' / '+f.ch+' / '+f.pwr+' dBm'],['MAC',f.mac],
+   [Z?'Kanal-Frames in den Funk /s':'Kanal-Frames aus Funk /s',Z?o.ch_cable:o.ch_funk],['Frames gesendet /s',o.frames_out],['Frames empfangen /s',o.frames_in],
+   ['Nicht zugestellt (gesamt)',o.noack],['Warteschlange voll (gesamt)',o.qfull]]);
+  var w=[];if(f.conflict)w.push('Zweite Zentrale mit derselben Kennung im Funk. Pro Fahrzeug nur eine Zentrale.');
+  if(f.dup_addr)w.push('Eine Gegenstelle hat dieselbe CRSF-Adresse ('+f.addr+'). Moduladresse ändern.');
+  if(!f.connected&&!Z)w.push('Failsafe: seit '+(f.lost_ms/1000).toFixed(1).replace('.',',')+' s nichts von der Zentrale.');
+  $('fwarn').innerHTML=w.join('<br>');
+  $('fpt').textContent='Gegenstellen ('+f.peers.length+')';
+  $('fpeers').innerHTML=f.peers.length?'<table><tr><th></th><th>Name</th><th>Rolle</th><th>Adresse</th><th>Pakete/s</th><th>Verlust</th><th>RSSI</th><th>Aussetzer</th><th>längste Lücke</th><th>verbunden</th></tr>'+
+   f.peers.map(function(p){return '<tr><td><span class="amp '+amp(p.loss,p.rssi,p.alive)+'"></span></td><td>'+p.name+'</td><td>'+p.role+'</td><td class="mono">'+p.addr+'</td><td>'+p.pps+'</td><td>'+pct(p.loss)+'</td><td>'+p.rssi+' dBm</td><td>'+p.drops+'</td><td>'+p.gap+' ms</td><td>'+p.up+'</td></tr>';}).join('')+'</table>'
+   :'<p class="mut">Noch keine Gegenstelle. Kennung und Funkkanal müssen überall gleich sein.</p>';
+}).catch(function(){});}
+setInterval(funkPoll,1000);
 (function(){var o='';for(var i=0;i<16;i++)o+='<option value="'+i+'">'+i+' ('+hex(i)+')</option>';$('madr').innerHTML=o;
  o='';for(var v=-5;v<=5;v++)o+='<option value="'+v+'">'+(v>0?'+':'')+(v/10).toFixed(1)+' V</option>';$('vcorr').innerHTML=o;})();
 function loadCfg(){fetch('/api/config').then(function(r){return r.json();}).then(function(c){C=c;
   rcFillSelect($('pbr'),RC_ROLES,c.portb_role);rcFillBaud($('pbb'),c.portb_baud);
   rcFillSelect($('pcr'),RC_ROLES,c.portc_role);rcFillBaud($('pcb'),c.portc_baud);
   $('madr').value=c.moduleAddr;$('vmode').value=c.voltMode;$('vcorr').value=c.voltCorr;$('tsend').value=c.tempSend?1:0;
-  $('ssid').value=c.ssid;$('ip').value=c.ip;$('dnam').value=c.devName;$('wauto').value=c.wifiAuto?1:0;$('wtmo').value=c.wifiTimeout;$('walw').value=c.wifiAlways?1:0;});}
+  $('ssid').value=c.ssid;$('ip').value=c.ip;$('dnam').value=c.devName;$('wauto').value=c.wifiAuto?1:0;$('wtmo').value=c.wifiTimeout;$('walw').value=c.wifiAlways?1:0;
+  $('fin').value=c.input||0;$('fid').value=c.funk_id;$('fch').value=c.funk_ch;$('fpwr').value=c.funk_pwr;$('frate').value=c.funk_rate;$('fback').value=c.funk_back?1:0;funkRows();});}
 ['pbr','pcr'].forEach(function(id){$(id).onchange=function(){var b=rcRoleDefaultBaud(+this.value);if(b)$(id==='pbr'?'pbb':'pcb').value=String(b);};});
 $('savePorts').onclick=function(){post('/api/config',{portb_role:+$('pbr').value,portb_baud:+$('pbb').value,portc_role:+$('pcr').value,portc_baud:+$('pcb').value,moduleAddr:+$('madr').value})
   .then(function(r){msg('pmsg',r,'Gespeichert. Ports gelten nach dem Neustart.');});};
@@ -113,7 +167,8 @@ function poll(){fetch('/api/status').then(function(r){return r.json();}).then(fu
   $('hdr').textContent='v'+s.version+' · '+hex(s.moduleAddr);
   kv('st',[['RC-Signal',s.rc?'<b class="ok">OK</b>':'<b class="bad">kein Signal</b>'],['Link-Qualität',s.lq+' %'],['Eingang (Port A)',s.rxBytes+' Bytes · '+s.rxFrames+' Frames · '+s.rxCrc+' CRC-Fehler'],
     ['Status-LED',s.ledText],['Moduladresse','WM '+s.moduleAddr+' · '+hex(s.moduleAddr)],
-    ['Adresskonflikt',s.dupAddr?'<b class="bad">ja, ein Gerät an Port '+(s.dupPorts==3?'B und C':s.dupPorts==2?'C':'B')+' hat dieselbe Adresse</b>':'nein'],
+    ['Adresskonflikt',s.dupAddr?'<b class="bad">ja, ein Gerät '+(s.dupPorts&4?'im Funk':'an Port '+(s.dupPorts==3?'B und C':s.dupPorts==2?'C':'B'))+' hat dieselbe Adresse</b>':'nein'],
+    ['Eingang',['Kabel (Port A)','Kabel + Funk (Zentrale)','Funk (Teilnehmer)'][s.input||0]+(s.funk?' · '+(s.funk.connected?'<span class="ok">verbunden, '+s.funk.peers+' Gegenstelle(n)</span>':'<span class="bad">keine Funk-Verbindung</span>'):'')],
     ['Empfängerspannung',s.volt.toFixed(2)+' V'],['Temperatur',s.temp.toFixed(1)+' °C'],['Laufzeit',Math.floor(s.uptime/60)+' min']]);
   kv('fw',[['Frames runter',s.fwdDown],['Frames hoch',s.fwdUp],['Verworfen',s.dropped],['CRC-Fehler von unten',s.crcDown]]);
   kv('pact',s.ports.map(function(p){return [p.name,rcRoleName(p.role)+(p.role?' · '+rcBaudName(p.baud):'')+(p.duplicate?' <span class="warn">(Rolle schon auf Port B)</span>':'')];}));

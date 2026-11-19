@@ -5,7 +5,7 @@
 // Teil von RC_Common: jedes Projekt traegt eine identische Kopie des
 // Ordners RC_Common; Aenderungen immer in allen Kopien nachziehen und
 // CRSF_ESP32_VERSION hochzaehlen. Aenderungshistorie: README.md hier.
-#define CRSF_ESP32_VERSION "1.1.1"
+#define CRSF_ESP32_VERSION "1.2.0"
 
 #include "crsf_platform.h"
 #include "crsf_esp32_protocol.h"
@@ -60,6 +60,10 @@ public:
     void attach_stream(Stream* stream) { serial_data = stream; portA_.ser = stream; }
     // Router mit bereits geoeffneten Datenstroemen (Host-Tests).
     void attach_router_streams(Stream* portB, Stream* portC);
+    // 1.2.0: Funk-Verbindung (RC_Common funk_link.h) als vierter Port D.
+    // Verhaelt sich wie B/C: Frames von A gehen nach D, Antworten von D
+    // nach A. nullptr = kein Funk.
+    void attach_funk_stream(Stream* portD);
 
     // B/C lesen, nach A weiterleiten, Warteschlangen abarbeiten. Jeden Loop
     // nach read_packets() aufrufen; ohne aktive Kette ohne Wirkung.
@@ -71,7 +75,8 @@ public:
     uint32_t getDownCrcErrors() const { return downCrcErrors; }
     // Ein Modul weiter hinten in der Kette meldet unsere Adresse
     bool     isDuplicateAddress() const { return duplicateAddress; }
-    // 1.1.1: an welchem Port kam die doppelte Adresse (Bit 0 = B, Bit 1 = C)
+    // 1.1.1: an welchem Port kam die doppelte Adresse (Bit 0 = B, Bit 1 = C,
+    // seit 1.2.0 Bit 2 = D/Funk)
     uint8_t  getDuplicatePorts() const { return duplicatePorts; }
 
     void read_packets(uint8_t debug);
@@ -176,7 +181,7 @@ private:
     void routeFromDown(CrsfPort& p);
     void enqueue(CrsfPort& p, const uint8_t* f, uint8_t n);
     void serviceQueue(CrsfPort& p);
-    CrsfPort portA_, portB_, portC_;   // portA_ nur Sendewarteschlange
+    CrsfPort portA_, portB_, portC_, portD_;   // portA_ nur Sendewarteschlange, D = Funk (1.2.0)
     bool     routerActive  = false;
     uint32_t fwdDown       = 0;
     uint32_t fwdUp         = 0;

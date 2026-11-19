@@ -1,0 +1,50 @@
+name: Pruefstand Funk-Bruecke bauen
+
+# Baut den Test-Sketch "Funk-Bruecke" (ESP-NOW <-> CRSF) fuer ESP32-S3,
+# ESP32-C3 und klassischen ESP32, jeweils mit esp32-Core 3.0.7 (wie die
+# Modul-Firmware) und 3.3.12 (Arduino IDE).
+on:
+  push:
+    paths: ["pruefstand/**", ".github/workflows/pruefstand-funk.yml"]
+  pull_request:
+    paths: ["pruefstand/**", ".github/workflows/pruefstand-funk.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Funk-Bruecke ${{ matrix.chip }} (Core ${{ matrix.core }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        core: ["3.0.7", "3.3.12"]
+        chip: [s3, c3, esp32]
+        include:
+          - chip: s3
+            fqbn: "esp32:esp32:esp32s3:CDCOnBoot=cdc,USBMode=hwcdc,FlashSize=4M,PartitionScheme=default"
+          - chip: c3
+            fqbn: "esp32:esp32:esp32c3:CDCOnBoot=cdc,FlashSize=4M,PartitionScheme=default"
+          - chip: esp32
+            fqbn: "esp32:esp32:esp32:FlashSize=4M,PartitionScheme=default"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: ESP32-Core installieren
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@${{ matrix.core }}
+      - name: Kompilieren
+        run: |
+          arduino-cli compile --warnings default --fqbn "${{ matrix.fqbn }}" \
+            --output-dir build pruefstand/Funk_Bruecke
+          mkdir -p out
+          cp build/Funk_Bruecke.ino.bin        out/Funk_Bruecke_${{ matrix.chip }}_ota.bin
+          cp build/Funk_Bruecke.ino.merged.bin out/Funk_Bruecke_${{ matrix.chip }}_komplett.bin
+      - uses: actions/upload-artifact@v4
+        if: matrix.core == '3.3.12'
+        with:
+          name: funk-bruecke-${{ matrix.chip }}
+          # *_komplett.bin = ab Adresse 0x0 per USB flashen, *_ota.bin = Update per WebUI
+          path: out/*.bin

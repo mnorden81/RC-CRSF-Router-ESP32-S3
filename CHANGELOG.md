@@ -2,6 +2,12 @@
 
 Die Version wird bei jeder Änderung erhöht, auch die CRSF „Parameter Version Number“ im DEVICE_INFO. Neueste Version oben.
 
+## v0.4.0 (RC_Common 1.5.0)
+- Neu: **Funk** (ESP-NOW, aus der Funk-Brücke v0.1.9). Einstellung „Eingang“: Kabel (wie bisher), „Kabel + Funk (Zentrale)“ = CRSF vom Empfänger geht zusätzlich per Funk an Teilnehmer (Router-Port D), „Funk (Teilnehmer)“ = CRSF kommt nur aus dem Funk, Port A bleibt frei, Port B/C verteilen weiter. Passt zum Multiswitch ab v5.01 und zur Funk-Brücke.
+- Einstellungen Fahrzeug-Kennung, Funkkanal, Sendeleistung, Kanal-Rate (Zentrale), Rückkanal (Teilnehmer): WebUI-Reiter „Funk“ oder Lua-Ordner „Funk“ (Felder 28–35). Gelten nach Neustart. NVS `input fkid fkch fkpwr fkrate fkback`.
+- WebUI-Reiter „Funk“: Ampel, Zähler, Gegenstellen mit Rolle, Adresse, Verlust, RSSI. Übersicht zeigt den Eingang.
+- Gelber Doppelblitz auch bei einer zweiten Funk-Zentrale, Adresskonflikt „im Funk“. Mit Funk läuft das WLAN auf dem Funkkanal. Noch nicht auf Hardware getestet.
+
 ## v0.3.8 (RC_Common 1.4.0)
 - Status-LED einheitlich mit allen Modulen: kein Signal = rot Aufblitzen (vorher rot schnell), rot schnell = Frames, aber Failsafe / kein RC-Link, WLAN an = violett auch beim Aufblitzen. Farben und Muster aus RC_Common.
 

@@ -348,6 +348,26 @@ static void test_router_queue_drops_oldest_rc_frame_when_full(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)(200 + 3), portB.tx[3]);
 }
 
+// 1.2.0: Funk als Port D, verhaelt sich wie B/C
+static void test_router_funk_port_d(void) {
+    crsf.setDeviceAddress(0xC4);
+    crsf.attach_funk_stream(&portC);
+    TEST_ASSERT_TRUE(crsf.isRouterActive());
+    uint16_t ch[16] = {0};
+    std::vector<uint8_t> f = channels_frame(ch);
+    io.feed(f);
+    crsf.read_packets(0);
+    TEST_ASSERT_TRUE(portC.tx == f);
+    std::vector<uint8_t> info = frame(CRSF_FRAMETYPE_DEVICE_INFO,
+        {0xEA, 0xC4, 'X', 0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 3, 0});
+    portC.feed(info);
+    crsf.route_packets();
+    TEST_ASSERT_TRUE(io.tx == info);
+    TEST_ASSERT_EQUAL_UINT8(4, crsf.getDuplicatePorts());
+    crsf.attach_funk_stream(nullptr);
+    TEST_ASSERT_FALSE(crsf.isRouterActive());
+}
+
 static void test_router_inactive_without_ports(void) {
     uint16_t ch[16] = {0};
     io.feed(channels_frame(ch));
@@ -397,6 +417,7 @@ int main(int, char**) {
     RUN_TEST(test_router_forwards_up_and_detects_duplicate_address);
     RUN_TEST(test_router_never_forwards_between_b_and_c);
     RUN_TEST(test_router_queue_drops_oldest_rc_frame_when_full);
+    RUN_TEST(test_router_funk_port_d);
     RUN_TEST(test_router_inactive_without_ports);
     RUN_TEST(test_last_rc_frame_time);
     RUN_TEST(test_folder_from_array_matches_list);

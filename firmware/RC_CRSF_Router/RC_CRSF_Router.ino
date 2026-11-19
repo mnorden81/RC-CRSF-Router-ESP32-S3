@@ -20,6 +20,13 @@
    Rollen und Baudraten gelten nach einem Neustart. S.Port, GPS und Raw
    nur auf einem Port (doppelt gewaehlt laeuft die Rolle auf Port B).
 
+   ── Funk (v0.4.0, RC_Common 1.5.0 funk_link) ───────────────────────────
+   Eingang "Kabel + Funk (Zentrale)": CRSF vom Empfaenger an Port A geht
+   zusaetzlich per ESP-NOW an Teilnehmer (Router-Port D). Eingang "Funk
+   (Teilnehmer)": CRSF kommt nur aus dem Funk, Port A bleibt frei, Port B/C
+   verteilen wie gewohnt. Kennung und Funkkanal ueberall gleich einstellen.
+   WLAN laeuft dann auf dem Funkkanal.
+
    ── Adresse ───────────────────────────────────────────────────────────
    Eigene WM-Moduladresse 0-15 -> CRSF-Adresse 0xC0+Adresse, Vorgabe 15
    (0xCF). Mehrere Router im Modell bekommen verschiedene Adressen (z. B.
@@ -60,16 +67,17 @@
 #include "src/RC_Common/lua_menu.h"
 #include "src/RC_Common/wifi_failsafe.h"
 #include "src/RC_Common/status_led.h"
+#include "src/RC_Common/funk_link.h"
 #include "pins.h"
 #include "router_config.h"
 #include "router_web.h"
 
 // Version: bei jeder Aenderung hochzaehlen (auch PARAM-Version im DEVICE_INFO)
 #define FW_MAJOR 0
-#define FW_MINOR 3
-#define FW_PATCH 8
-static const char*   FW_VERSION       = "0.3.8";
-static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 38
+#define FW_MINOR 4
+#define FW_PATCH 0
+static const char*   FW_VERSION       = "0.4.0";
+static const uint8_t FW_PARAM_VERSION = FW_MAJOR * 100 + FW_MINOR * 10 + FW_PATCH;   // 40
 // Versionsgeschichte: siehe CHANGELOG.md im Hauptordner des Repos.
 
 static HardwareSerial* const UPLINK_SERIAL = &Serial0;
@@ -82,6 +90,7 @@ static UartPort uartPorts[2] = {
 };
 
 CRSF crsf;
+FunkLink funk;   // v0.4.0, auch in router_web.cpp
 static WifiFailsafe wifiFailsafe;
 
 static bool          busOk          = false;
@@ -96,7 +105,8 @@ static constexpr unsigned long CRSF_TIMEOUT_MS = 2000;
 #define CRSF_SLOT_MS 5
 static inline uint8_t  ownAddr()       { return 0xC0 + (uint8_t)constrain(cfg.common.moduleAddr, 0, 15); }
 static inline uint16_t slotDelayMs()   { return (uint16_t)constrain(cfg.common.moduleAddr, 0, 15) * 2 * CRSF_SLOT_MS; }
-static bool configError()              { return crsf.isDuplicateAddress() || uartPorts[1].duplicate; }
+static bool dupAny()                   { return crsf.isDuplicateAddress() || funk.dupAddr(); }
+static bool configError()              { return dupAny() || uartPorts[1].duplicate || funk.conflict(); }
 
 void routerRequestRestart() { cfgSave(); restartAtMs = millis() + 500; if (!restartAtMs) restartAtMs = 1; }
 
@@ -110,7 +120,9 @@ void routerRequestRestart() { cfgSave(); restartAtMs = millis() + 500; if (!rest
 //                   18 CRC-Fehler unten  19 Adresskonflikt
 // 20 Ordner WLAN    21 WLAN jetzt  22 Auto-WLAN  23 Auto-WLAN Timeout  24 WLAN dauerhaft an
 // 25 Neustart       26 Info Geraetename  27 LED Reihenfolge
-static constexpr uint8_t LUA_COUNT = 27;
+// 28 Ordner Funk    29 Eingang  30 Kennung  31 Kanal  32 Leistung
+//                   33 Kanaele alle (Zentrale)  34 Rueckkanal (Teilnehmer)  35 Info Verbindung
+static constexpr uint8_t LUA_COUNT = 35;
 static LuaItem luaItems[LUA_COUNT + 1];
 static LuaMenu luaMenu(luaItems, sizeof(luaItems) / sizeof(luaItems[0]));
 
@@ -134,7 +146,7 @@ static void luaShowPortsFolder(uint8_t, LuaView& v, char* buf) {
 static void luaViewBaud(uint8_t a, LuaView& v, char*) { if (luaGetRole(a) == 0) v.hidden = true; }
 static void    luaSetBaud(uint8_t a, uint8_t v) { cfg.common.baud[a] = uartBaudFromIndex(v); cfgMarkDirty(); }
 static uint8_t luaGetAddr(uint8_t)              { return (uint8_t)constrain(cfg.common.moduleAddr, 0, 15); }
-static void    luaSetAddr(uint8_t, uint8_t v)   { cfg.common.moduleAddr = v; crsf.setDeviceAddress(ownAddr()); cfgMarkDirty(); }
+static void    luaSetAddr(uint8_t, uint8_t v)   { cfg.common.moduleAddr = v; crsf.setDeviceAddress(ownAddr()); funk.setCrsfAddr(ownAddr()); cfgMarkDirty(); }
 
 static uint8_t luaGetVMode(uint8_t)             { return cfg.voltMode; }
 static void    luaSetVMode(uint8_t, uint8_t v)  { cfg.voltMode = v; cfgMarkDirty(); }
@@ -151,8 +163,9 @@ static void luaShowCount(uint8_t a, LuaView& v, char* buf) {
     snprintf(buf, LUA_VIEW_BUF, "%lu", (unsigned long)n); v.text = buf;
 }
 static const char* dupText() {
-    if (!crsf.isDuplicateAddress()) return "nein";
+    if (!crsf.isDuplicateAddress()) return funk.dupAddr() ? "ja, im Funk" : "nein";
     uint8_t p = crsf.getDuplicatePorts();
+    if (p & 4) return "ja, im Funk";   // v0.4.0: Port D
     return p == 3 ? "ja, Port B+C" : p == 2 ? "ja, Port C" : "ja, Port B";
 }
 static void luaShowDup(uint8_t, LuaView& v, char*) { v.text = dupText(); }
@@ -169,6 +182,47 @@ static uint8_t luaGetLedRgb(uint8_t)              { return cfg.ledRgb ? 0 : 1; }
 static void    luaSetLedRgb(uint8_t, uint8_t v)   { cfg.ledRgb = (v == 0); cfgMarkDirty(); }
 static uint8_t luaGetRestart(uint8_t)             { return restartAtMs ? 1 : 0; }
 static void    luaSetRestart(uint8_t, uint8_t v)  { if (v) routerRequestRestart(); }
+
+// Funk (v0.4.0): wirkt nach Neustart
+static uint8_t luaGetInput(uint8_t)            { return cfg.input; }
+static void    luaSetInput(uint8_t, uint8_t v) { cfg.input = v; cfgMarkDirty(); }
+static uint8_t luaGetFunk(uint8_t i) {
+    switch (i) {
+        case 0: return cfg.funk.id;
+        case 1: return cfg.funk.ch;
+        case 2: return funkPwrIndex(cfg.funk.pwr);
+        case 3: return funkRateIndex(cfg.funk.rateMs);
+        default: return cfg.funk.back ? 1 : 0;
+    }
+}
+static void luaSetFunk(uint8_t i, uint8_t v) {
+    switch (i) {
+        case 0: cfg.funk.id = v; break;
+        case 1: cfg.funk.ch = v; break;
+        case 2: cfg.funk.pwr = FUNK_PWR_VALUES[v < FUNK_PWR_COUNT ? v : FUNK_PWR_COUNT - 1]; break;
+        case 3: cfg.funk.rateMs = FUNK_RATE_VALUES[v < FUNK_RATE_COUNT ? v : FUNK_RATE_COUNT - 1]; break;
+        default: cfg.funk.back = (v != 0); break;
+    }
+    funkConfigClamp(cfg.funk);
+    cfgMarkDirty();
+}
+static void luaShowFunkFolder(uint8_t, LuaView& v, char* buf) {
+    if (!funk.active()) { v.name = "Funk (aus)"; return; }
+    snprintf(buf, LUA_VIEW_BUF, "Funk (%s, %s)", funkRoleName(funk.role()),
+             funk.connected() ? "verbunden" : "keine Verbindung");
+    v.name = buf;
+}
+static void luaViewFunkSet(uint8_t, LuaView& v, char*)  { if (cfg.input == IN_CABLE) v.hidden = true; }
+static void luaViewFunkRate(uint8_t, LuaView& v, char*) { if (cfg.input != IN_CABLE_FUNK) v.hidden = true; }
+static void luaViewFunkBack(uint8_t, LuaView& v, char*) { if (cfg.input != IN_FUNK) v.hidden = true; }
+static void luaViewFunkInfo(uint8_t, LuaView& v, char* buf) {
+    if (!funk.active()) { v.text = "Funk aus"; return; }
+    if (funk.conflict()) { v.text = "2. Zentrale!"; return; }
+    if (!funk.connected()) { v.text = "keine Gegenstelle"; return; }
+    snprintf(buf, LUA_VIEW_BUF, "%u Geg., %.1f%% Verl., %d dBm",
+             (unsigned)funk.partnerCount(), funk.worstLoss(), (int)funk.worstRssi());
+    v.text = buf;
+}
 
 static void buildLuaMenu() {
     static const char* AUS_EIN = "Aus;Ein";
@@ -200,6 +254,15 @@ static void buildLuaMenu() {
     m.select(25, 0, "Neustart", "Nein;Jetzt", luaGetRestart, luaSetRestart);
     m.info(26, 0, "Geraetename", "")->view = luaShowName;
     m.select(27, 0, "LED Reihenfolge", "RGB (S3-Zero);GRB", luaGetLedRgb, luaSetLedRgb);
+    // v0.4.0: Funk (ESP-NOW)
+    m.folder(28, 0, "Funk")->view = luaShowFunkFolder;
+    m.select(29, 28, "Eingang (Neustart)", "Kabel;Kabel + Funk (Zentrale);Funk (Teilnehmer)", luaGetInput, luaSetInput);
+    m.u8(30, 28, "Kennung (Neustart)", 1, 255, "", luaGetFunk, luaSetFunk, 0)->view = luaViewFunkSet;
+    m.u8(31, 28, "Kanal (Neustart)", 1, 13, "", luaGetFunk, luaSetFunk, 1)->view = luaViewFunkSet;
+    m.select(32, 28, "Leistung (Neustart)", FUNK_PWR_OPTIONS, luaGetFunk, luaSetFunk, 2)->view = luaViewFunkSet;
+    m.select(33, 28, "Kanaele alle (Neustart)", FUNK_RATE_OPTIONS, luaGetFunk, luaSetFunk, 3)->view = luaViewFunkRate;
+    m.select(34, 28, "Rueckkanal (Neustart)", "Aus;An", luaGetFunk, luaSetFunk, 4)->view = luaViewFunkBack;
+    m.info(35, 28, "Verbindung", "")->view = luaViewFunkInfo;
 }
 
 // ======== Status-LED ==================================================
@@ -218,8 +281,9 @@ static void updateLed() {
     in.linkStatsMs   = ls.lastUpdate;
     in.uplinkLQ      = ls.uplinkLQ;
     ledMode = statusLedMode(in, now);
-    bool dup = crsf.isDuplicateAddress();
-    ledText = (ledMode == SLED_DOUBLE && !dup) ? "gelb Doppelblitz: doppelte Port-Rolle"
+    bool dup = dupAny();
+    ledText = (ledMode == SLED_DOUBLE && !dup) ? (funk.conflict() ? "gelb Doppelblitz: zweite Funk-Zentrale"
+                                                                  : "gelb Doppelblitz: doppelte Port-Rolle")
                                                : statusLedText(ledMode, dup, webApActive());
     statusLed.setRgbOrder(cfg.ledRgb);
     statusLed.update(ledMode, now, dup, webApActive());
@@ -307,6 +371,7 @@ String routerStatusJson() {
     j += ",\"moduleAddr\":" + String(cfg.common.moduleAddr);
     j += ",\"dupAddr\":" + String(crsf.isDuplicateAddress() ? "true" : "false");
     j += ",\"dupPorts\":" + String(crsf.getDuplicatePorts());
+    j += ",\"input\":" + String(cfg.input) + ",\"funk\":" + funk.summaryJson();   // v0.4.0
     j += ",\"ledText\":\"" + String(ledText) + "\"";
     j += ",\"volt\":" + String(rxVolt, 2) + ",\"temp\":" + String(espTemp, 1);
     j += ",\"uptime\":" + String(millis() / 1000);
@@ -340,7 +405,15 @@ void setup() {
     statusLed.begin(PIN_STATUS_LED, true);
     statusLed.setRgbOrder(cfg.ledRgb);
 
-    crsf.init_crsf(UPLINK_SERIAL, PIN_UPLINK_RX, PIN_UPLINK_TX);
+    // v0.4.0: Eingang Kabel, Kabel + Funk (Zentrale) oder Funk (Teilnehmer)
+    if (cfg.input == IN_FUNK) {
+        funk.begin(FUNK_TEILNEHMER, cfg.funk, cfg.common.devName, ownAddr());
+        crsf.attach_stream(&funk);   // Port A bleibt frei
+    } else {
+        crsf.init_crsf(UPLINK_SERIAL, PIN_UPLINK_RX, PIN_UPLINK_TX);
+        if (cfg.input == IN_CABLE_FUNK && funk.begin(FUNK_ZENTRALE, cfg.funk, cfg.common.devName, ownAddr()))
+            crsf.attach_funk_stream(&funk);
+    }
     crsf.setDeviceAddress(ownAddr());
 
     webBegin();
@@ -363,6 +436,7 @@ void loop() {
     webLoop();
     uartPortsUpdate();
 
+    funk.loop();   // v0.4.0: vor read_packets()
     crsf.read_packets(0);
     crsf.route_packets();
     static uint32_t lastValid = 0;
