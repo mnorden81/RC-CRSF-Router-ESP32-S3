@@ -12,12 +12,19 @@
 #include <Arduino.h>
 #include "src/RC_Common/settings_common.h"
 #include "src/RC_Common/uart_roles.h"
+#include "src/RC_Common/funk_link.h"
 
 // Spannung senden: 0 = Aus, 1 = als RxBt (Batterie-Frame 0x08),
 // 2 = als Zellen-Wert (Frame 0x0E, Quelle 8)
 static constexpr uint8_t VOLT_OFF   = 0;
 static constexpr uint8_t VOLT_RXBT  = 1;
 static constexpr uint8_t VOLT_CELLS = 2;
+
+// Eingang (v0.4.0): 0 = Kabel (Port A), 1 = Kabel + Funk senden (Zentrale),
+// 2 = Funk (Teilnehmer, Port A bleibt frei)
+static constexpr uint8_t IN_CABLE      = 0;
+static constexpr uint8_t IN_CABLE_FUNK = 1;
+static constexpr uint8_t IN_FUNK       = 2;
 
 struct RouterConfig {
     RcCommonSettings common;   // ssid, pass, ip, devName, moduleAddr, WLAN, role[2], baud[2]
@@ -26,6 +33,8 @@ struct RouterConfig {
     bool    tempSend;          // Temperatur als CRSF-Telemetrie (0x0D)
     uint8_t sportPollId[2];    // S.Port Poll-Bytes Sensor 1/2
     bool    ledRgb;            // LED-Farbreihenfolge: true = RGB (S3-Zero), false = GRB (WS2812-Standard)
+    uint8_t input;             // IN_* (v0.4.0, NVS "input")
+    FunkConfig funk;           // Funk (v0.4.0, NVS fkid/fkch/fkpwr/fkrate/fkback)
 };
 
 extern RouterConfig  cfg;

@@ -2,21 +2,22 @@
 
 CRSF-Verteiler für ELRS-Empfänger auf einem **ESP32-S3-Zero**. Der Router hängt an einem freien CRSF-Port des Empfängers und verteilt CRSF auf zwei weitere Ports (Port B und Port C). So lassen sich mehrere Module an einem Empfänger betreiben und verketten: RC-Multiswitch C3/S3, Multiswitch Basis (Ziege-One), Soundmodule, G030-Multiswitch und weitere Router.
 
-> **Stand:** Firmware v0.3.8 als fertiger Arduino-Sketch auf Basis von **RC_Common 1.4.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`. Alle Versionen: [CHANGELOG.md](CHANGELOG.md).
+> **Stand:** Firmware v0.4.0 (Funk, noch nicht auf Hardware getestet) als fertiger Arduino-Sketch auf Basis von **RC_Common 1.5.0** (`firmware/RC_CRSF_Router/`). Gebaut über GitHub Actions; Port A und Telemetrie am 04.11.2026 auf Hardware getestet. Das erste Gerüst v0.2.0 liegt zum Vergleich in `firmware/v0.2.0-geruest/`. Alle Versionen: [CHANGELOG.md](CHANGELOG.md).
 
 ![Testaufbau: TX16S zeigt CRSF-Router@15 und zwei Sound-Minis hinter dem Router](docs/bilder/testaufbau.jpg)
 
 *Testaufbau 05.11.2026: ELRS-Empfänger, S3-Router und zwei Sound-Minis. Der Sender (TX16S) zeigt unter „Other Devices“ den Router „CRSF-Router@15“ und die Module „Sound-Mini@0“ und „Sound-Mini@1“ hinter ihm.*
 
-## Funktionen (v0.3.8)
+## Funktionen (v0.4.0)
 
 - Weiterleitung Empfänger → Port B/C und zurück, Ketten über mehrere Stufen (RC_Common-Router). Nach unten geht alles außer Anfragen an die eigene Adresse, nach oben alles, zwischen B und C nie.
 - Jeder Port wählbar: Aus / CRSF / S.Port / GPS / Raw (Lua und WebUI), gilt nach Neustart
 - Eigene WM-Moduladresse 0–15 (Vorgabe 15 = 0xCF), mehrere Router im Modell möglich, Warnung bei doppelter Adresse
+- Funk (ab v0.4.0, ESP-NOW): Eingang „Kabel + Funk (Zentrale)“ funkt CRSF vom Empfänger an Teilnehmer weiter, Eingang „Funk (Teilnehmer)“ holt CRSF aus dem Funk statt von Port A. Gleiche Technik wie Multiswitch v5.01 und Funk-Brücke, Kennung und Funkkanal überall gleich einstellen
 - Status-LED in Farben (siehe unten)
 - Telemetrie: Empfängerspannung (als RxBt oder Zellen-Wert), Temperatur des ESP32, FLVSS über S.Port, GPS
-- Lua-Menü am Sender: Ports, Adresse, Telemetrie, Zähler, WLAN, Neustart
-- WebUI: Status, Ports, Telemetrie, WLAN, Backups im Modul, Export/Import, Firmware-Update (OTA)
+- Lua-Menü am Sender: Ports, Adresse, Telemetrie, Zähler, WLAN, Neustart, Funk
+- WebUI: Status, Ports, Telemetrie, Funk, WLAN, Backups im Modul, Export/Import, Firmware-Update (OTA)
 
 Geplant für später: Geräteliste und Telemetrie-Übersicht über den ganzen Baum (RC_Common 1.3.0), Telemetrie-Bremse, Parameter-Browser in der WebUI.
 

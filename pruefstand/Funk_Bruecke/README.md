@@ -1,6 +1,8 @@
 # Prüfstand: Module per Funk verbinden (Funk-Brücke)
 
-Autor: PiperPilot · Version 0.1.9 · noch nicht auf Hardware getestet
+Autor: PiperPilot · Version 0.1.9 · am 19.11.2026 auf Hardware getestet (0,2 % Verlust, Lua und Failsafe OK)
+
+> Seit Multiswitch v5.01 und CRSF-Router v0.4.0 steckt dieselbe Funk-Technik direkt in den Modulen (RC_Common 1.5.0, `funk_link.*`). Eine Brücke passt weiterhin an jede Seite, z. B. am Empfänger für ein Modul ohne Funk-Firmware.
 
 Hier testen wir, ob die Module statt per Kabel auch per Funk (ESP-NOW) zuverlässig CRSF bekommen. Die bestehende Firmware der Module bleibt dabei **unverändert**.
 

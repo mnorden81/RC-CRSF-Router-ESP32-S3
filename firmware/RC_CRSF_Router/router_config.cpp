@@ -29,6 +29,8 @@ void cfgDefaults() {
     cfg.sportPollId[0] = 0xA1;     // Physical ID 1 (Werkseinstellung FLVSS)
     cfg.sportPollId[1] = 0x22;     // Physical ID 2
     cfg.ledRgb         = true;     // S3-Zero: Rot und Gruen sind gegenueber WS2812 vertauscht
+    cfg.input          = IN_CABLE;
+    cfg.funk           = FunkConfig();
 }
 
 void cfgSanitize() {
@@ -37,6 +39,8 @@ void cfgSanitize() {
     if (cfg.voltMode > VOLT_CELLS) cfg.voltMode = VOLT_OFF;
     if (cfg.voltCorr < -5) cfg.voltCorr = -5;
     if (cfg.voltCorr > 5)  cfg.voltCorr = 5;
+    if (cfg.input > IN_FUNK) cfg.input = IN_CABLE;
+    funkConfigClamp(cfg.funk);
 }
 
 void cfgLoad() {
@@ -50,6 +54,8 @@ void cfgLoad() {
     cfg.sportPollId[0] = (uint8_t)p.getInt("spid0", cfg.sportPollId[0]);
     cfg.sportPollId[1] = (uint8_t)p.getInt("spid1", cfg.sportPollId[1]);
     cfg.ledRgb         = p.getInt("ledrgb", cfg.ledRgb ? 1 : 0) != 0;
+    cfg.input          = (uint8_t)p.getInt("input", cfg.input);
+    funkConfigLoad(p, cfg.funk);
     p.end();
     cfgSanitize();
 }
@@ -65,6 +71,8 @@ void cfgSave() {
     p.putInt("spid0", cfg.sportPollId[0]);
     p.putInt("spid1", cfg.sportPollId[1]);
     p.putInt("ledrgb", cfg.ledRgb ? 1 : 0);
+    p.putInt("input", cfg.input);
+    funkConfigSave(p, cfg.funk);
     p.end();
     cfgDirty = false;
 }
