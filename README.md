@@ -140,3 +140,7 @@ Alle Ports vollduplex. Rolle (Aus/CRSF/S.Port/GPS/Raw) und Baudrate von Port B u
 - [ESP32-Sound-Mini-S3](https://github.com/mnorden81/ESP32-Sound-Mini-S3)
 - [ESP32-Multiswitch-Basis_Ziege-One](https://github.com/mnorden81/ESP32-Multiswitch-Basis_Ziege-One)
 - [rcmultiswitchG030_eigen](https://github.com/mnorden81/rcmultiswitchG030_eigen)
+
+## Prüfstand (WebUI und Lua im Browser)
+
+In [`pruefstand/`](pruefstand/) liegt eine Seite, die die echte Weboberfläche und das Lua-Menü dieser Firmware im Browser zeigt (alle Varianten, Modul simuliert): [Prüfstand öffnen](https://raw.githack.com/mnorden81/RC-CRSF-Router-ESP32-S3/main/pruefstand/pruefstand.html). Sie wird bei jeder Firmware-Änderung neu gebaut, die GitHub-Prüfung „Prüfstand" achtet darauf.
